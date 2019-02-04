@@ -39,6 +39,7 @@
 *.opensdf
 *.user
 *.filters
+*.vcxproj
 
 # Visual Studio temporary directories
 **/Builds
