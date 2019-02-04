@@ -30,3 +30,18 @@
 *.exe
 *.out
 *.app
+
+# Visual Studio compiled files
+*.exe
+*.pdb
+*.sdf
+*.suo
+*.opensdf
+*.user
+*.filters
+
+# Visual Studio temporary directories
+**/Builds
+**/Debug
+**/Release
+**/ipch
