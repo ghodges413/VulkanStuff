@@ -41,6 +41,9 @@
 *.filters
 *.vcxproj
 
+# GLSLANG libs because github has a 100mb file limit
+**/glslang/lib
+
 # Visual Studio temporary directories
 **/Builds
 **/Debug
