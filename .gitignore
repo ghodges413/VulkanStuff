@@ -24,16 +24,16 @@
 *.lai
 *.la
 *.a
-*.lib
+#*.lib
 
 # Executables
-*.exe
+#*.exe
 *.out
 *.app
 
 # Visual Studio compiled files
-*.exe
-*.pdb
+#*.exe
+#*.pdb
 *.sdf
 *.suo
 *.opensdf
