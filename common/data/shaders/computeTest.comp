@@ -1,0 +1,26 @@
+#version 450
+
+layout( binding = 0 ) uniform writeonly image2D destTex;
+
+layout ( local_size_x = 16, local_size_y = 16 ) in;
+
+//in uvec3 gl_NumWorkGroups;
+//in uvec3 gl_WorkGroupID;
+//in uvec3 gl_LocalInvocationID;
+//in uvec3 gl_GlobalInvocationID;
+//in uint  gl_LocalInvocationIndex;
+
+/*
+ ==========================
+ main
+ ==========================
+ */
+void main() {
+	ivec2 storePos = ivec2( gl_GlobalInvocationID.xy );
+	
+	float r = cos( gl_LocalInvocationID.x + gl_LocalInvocationID.y );
+	float g = cos( gl_WorkGroupID.x + gl_WorkGroupID.y );
+	float b = cos( gl_GlobalInvocationID.x + gl_GlobalInvocationID.y );
+	
+	imageStore( destTex, storePos, vec4( r, g, b, 1.0 ) );
+ }
