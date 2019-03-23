@@ -10,27 +10,9 @@ uniforms
 layout( binding = 0 ) uniform uboCamera {
     mat4 view;
     mat4 proj;
-
-    /*
-    vec4 viewRow0;
-    vec4 viewRow1;
-    vec4 viewRow2;
-    vec4 viewRow3;
-
-    vec4 projRow0;
-    vec4 projRow1;
-    vec4 projRow2;
-    vec4 projRow3;
-    */
 } camera;
 layout( binding = 1 ) uniform uboModel {
     mat4 model;
-    /*
-    vec4 modelRow0;
-    vec4 modelRow1;
-    vec4 modelRow2;
-    vec4 modelRow3;
-    */
 } model;
 
 /*
@@ -63,20 +45,6 @@ out gl_PerVertex {
 
 /*
 ==========================================
-TransformPoint
-==========================================
-*/
-vec4 TransformPoint( in vec4 row0, in vec4 row1, in vec4 row2, in vec4 row3, in vec4 point ) {
-    vec4 pt;
-    pt.x = dot( row0, point );
-    pt.y = dot( row1, point );
-    pt.z = dot( row2, point );
-    pt.w = dot( row3, point );
-    return pt;
-}
-
-/*
-==========================================
 main
 ==========================================
 */
@@ -94,6 +62,5 @@ void main() {
 
     // Project coordinate to screen
     gl_Position = camera.proj * camera.view * model.model * vec4( inPosition, 1.0 );
-//    gl_Position = vec4( inPosition, 1.0 ) * model.model * camera.view * camera.proj;
     fragTexCoord = inTexCoord;
 }

@@ -664,7 +664,8 @@ bool Application::CreatePipeline( int windowWidth, int windowHeight ) {
 	rasterizer.rasterizerDiscardEnable = VK_FALSE;
 	rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
 	rasterizer.lineWidth = 1.0f;
-	rasterizer.cullMode = VK_CULL_MODE_FRONT_BIT;
+//	rasterizer.cullMode = VK_CULL_MODE_FRONT_BIT;	// Vulkan switched its NDC.  It made it right handed, and this flipped the y-direction.  This explains why we had this set
+	rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;	// Vulkan switched its NDC.  It made it right handed, and this flipped the y-direction.  This explains why we had this set
 	rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
 	rasterizer.depthBiasEnable = VK_FALSE;
 
@@ -996,7 +997,7 @@ bool Application::InitializeVulkan() {
 	{
 		Model model;
 		//const bool didLoad = model.LoadOBJ( "../common/data/meshes/static/companionCube.obj", false );
-		const bool didLoad = model.LoadOBJ( "../common/data/meshes/static/shaderBall3.obj", true );
+		const bool didLoad = model.LoadOBJ( "../common/data/meshes/static/shaderBall.obj", true );
 		if ( !didLoad ) {
 			printf( "Unable to load obj!\n" );
 			assert( 0 );
@@ -1632,14 +1633,43 @@ void mygluLookAt( Vec3d pos, Vec3d lookAt, Vec3d up, float * m ) {
 	m[ 15 ] = 1;    
 }
 
+
 /*
 ====================================
-mygluPerspective
+myglMatrixMultiply
+====================================
+*/
+void myglMatrixMultiply( const float * a, const float * b, float * out ) {
+	out[ 0 ]  = a[ 0 ]*b[ 0 ] + a[ 1 ]*b[ 4 ] + a[ 2 ]*b[ 8 ]  + a[3 ]*b[12];
+	out[ 1 ]  = a[ 0 ]*b[ 1 ] + a[ 1 ]*b[ 5 ] + a[ 2 ]*b[ 9 ]  + a[3 ]*b[13];
+	out[ 2 ]  = a[ 0 ]*b[ 2 ] + a[ 1 ]*b[ 6 ] + a[ 2 ]*b[ 10 ] + a[3 ]*b[14];
+	out[ 3 ]  = a[ 0 ]*b[ 3 ] + a[ 1 ]*b[ 7 ] + a[ 2 ]*b[ 11 ] + a[3 ]*b[15];
+
+	out[ 4 ]  = a[ 4 ]*b[ 0 ] + a[ 5 ]*b[ 4 ] + a[ 6 ]*b[ 8 ]  + a[7 ]*b[12];
+	out[ 5 ]  = a[ 4 ]*b[ 1 ] + a[ 5 ]*b[ 5 ] + a[ 6 ]*b[ 9 ]  + a[7 ]*b[13];
+	out[ 6 ]  = a[ 4 ]*b[ 2 ] + a[ 5 ]*b[ 6 ] + a[ 6 ]*b[ 10 ] + a[7 ]*b[14];
+	out[ 7 ]  = a[ 4 ]*b[ 3 ] + a[ 5 ]*b[ 7 ] + a[ 6 ]*b[ 11 ] + a[7 ]*b[15];
+
+	out[ 8 ]  = a[ 8 ]*b[ 0 ] + a[ 9 ]*b[ 4 ] + a[ 10 ]*b[ 8 ]  + a[11]*b[12];
+	out[ 9 ]  = a[ 8 ]*b[ 1 ] + a[ 9 ]*b[ 5 ] + a[ 10 ]*b[ 9 ]  + a[11]*b[13];
+	out[ 10 ] = a[ 8 ]*b[ 2 ] + a[ 9 ]*b[ 6 ] + a[ 10 ]*b[ 10 ] + a[11]*b[14];
+	out[ 11 ] = a[ 8 ]*b[ 3 ] + a[ 9 ]*b[ 7 ] + a[ 10 ]*b[ 11 ] + a[11]*b[15];
+
+	out[ 12 ] = a[ 12 ]*b[ 0 ] + a[ 13 ]*b[ 4 ] + a[ 14 ]*b[ 8 ]  + a[15]*b[12];
+	out[ 13 ] = a[ 12 ]*b[ 1 ] + a[ 13 ]*b[ 5 ] + a[ 14 ]*b[ 9 ]  + a[15]*b[13];
+	out[ 14 ] = a[ 12 ]*b[ 2 ] + a[ 13 ]*b[ 6 ] + a[ 14 ]*b[ 10 ] + a[15]*b[14];
+	out[ 15 ] = a[ 12 ]*b[ 3 ] + a[ 13 ]*b[ 7 ] + a[ 14 ]*b[ 11 ] + a[15]*b[15];
+}
+
+
+/*
+====================================
+mygluPerspectiveOpenGL
 * This is my version of glut's convenient perspective
 * matrix generation
 ====================================
 */
-void mygluPerspective( float fovy, float aspect_ratio, float near, float far, float * out ) {
+void mygluPerspectiveOpenGL( float fovy, float aspect_ratio, float near, float far, float * out ) {
 	// This perspective matrix definition was defined in http://www.opengl.org/sdk/docs/man/xhtml/gluPerspective.xml
 	const float fovy_radians = fovy * 3.14159f / 180.0f;
 	const float f = 1.0f / tanf( fovy_radians * 0.5f );
@@ -1666,6 +1696,79 @@ void mygluPerspective( float fovy, float aspect_ratio, float near, float far, fl
 	out[ 14] = ( 2.0f * far * near ) / ( near - far );
 	out[ 15] = 0;
 }
+void mygluPerspectiveVulkan( float fovy, float aspect_ratio, float near, float far, float * out ) {
+	// Vulkan changed its NDC.  It switch from a left handed coordinate system to a right handed one.
+	// +x points to the right, +z points into the screen, +y points down (it used to point in up, in opengl).
+	// It also changed the range from [-1,1] to [0,1]
+#if 1
+	float matVulkan[ 16 ];
+	matVulkan[ 0 ] = 1;
+	matVulkan[ 1 ] = 0;
+	matVulkan[ 2 ] = 0;
+	matVulkan[ 3 ] = 0;
+
+	matVulkan[ 4 ] = 0;
+	matVulkan[ 5 ] = -1;
+	matVulkan[ 6 ] = 0;
+	matVulkan[ 7 ] = 0;
+
+	matVulkan[ 8 ] = 0;
+	matVulkan[ 9 ] = 0;
+	matVulkan[ 10] = 0.5f;
+	matVulkan[ 11] = 0;
+
+	matVulkan[ 12] = 0;
+	matVulkan[ 13] = 0;
+	matVulkan[ 14] = 0.5f;
+	matVulkan[ 15] = 1;
+
+	float matOpenGL[ 16 ];
+	mygluPerspectiveOpenGL( fovy, aspect_ratio, near, far, matOpenGL );
+
+	myglMatrixMultiply( matOpenGL, matVulkan, out );
+#else
+	const float fovy_radians = fovy * 3.14159f / 180.0f;
+	const float f = 1.0f / tanf( fovy_radians * 0.5f );
+	const float xscale = f;
+	const float yscale = -f / aspect_ratio;
+
+	out[ 0 ] = xscale;
+	out[ 1 ] = 0;
+	out[ 2 ] = 0;
+	out[ 3 ] = 0;
+
+	out[ 4 ] = 0;
+	out[ 5 ] = yscale;
+	out[ 6 ] = 0;
+	out[ 7 ] = 0;
+
+	out[ 8 ] = 0;
+	out[ 9 ] = 0;
+	out[ 10] = ( far + near ) / ( near - far );
+	out[ 11] = -1;
+
+	out[ 12] = 0;
+	out[ 13] = 0;
+	out[ 14] = ( 2.0f * far * near ) / ( near - far );
+	out[ 15] = 0;
+#endif
+}
+
+/*
+====================================
+myMatTranspose
+====================================
+*/
+void myMatTranspose( float * data ) {
+	const int width = 4;
+	for ( int x = 0; x < width; x++ ) {
+		for ( int y = x + 1; y < width; y++ ) {
+			const int idx0 = x + width * y;
+			const int idx1 = y + width * x;
+			std::swap( data[ idx0 ], data[ idx1 ] );
+		}
+	}
+}
 
 /*
 ====================================================
@@ -1685,9 +1788,9 @@ void Application::DrawFrame() {
 
 	// Update the uniform buffer with the camera information
 	{
-		Vec3d camPos = Vec3d( 10, 0, 10 );	// this makes no sense... we have a bug
+		Vec3d camPos = Vec3d( 10, 0, 5 ) * 1.25f;
 		Vec3d camLookAt = Vec3d( 0, 0, 1 );
-		Vec3d camUp = Vec3d( 0, 0, -1 );
+		Vec3d camUp = Vec3d( 0, 0, 1 );
 
 		int windowWidth;
 		int windowHeight;
@@ -1697,7 +1800,7 @@ void Application::DrawFrame() {
 		const float zFar    = 1000.0f;
 		const float fovy	= 45;
 		const float aspect	= (float)windowHeight / (float)windowWidth;
-		mygluPerspective( fovy, aspect, zNear, zFar, camera.matProj );
+		mygluPerspectiveVulkan( fovy, aspect, zNear, zFar, camera.matProj );
 		mygluLookAt( camPos, camLookAt, camUp, camera.matView );
 
 		// Update the uniform buffer for the camera matrices
@@ -1751,9 +1854,9 @@ void Application::DrawFrame() {
 			const float y = sinf( time * float( i ) );
 
 			Entity_t & entity = m_entities[ i ];
-			entity.fwd = Vec3d( -x, y, 0 );
+			entity.fwd = Vec3d( x, y, 0 );
 			float matOrient[ 16 ];
-			myOrient( entity.pos, entity.fwd, entity.up, matOrient );
+			myOrient( entity.pos, entity.fwd, entity.up, matOrient );			
 
 			// Update the uniform buffer with the orientation of this entity
 			{
