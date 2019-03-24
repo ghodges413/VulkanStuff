@@ -1699,7 +1699,9 @@ void mygluPerspectiveOpenGL( float fovy, float aspect_ratio, float near, float f
 void mygluPerspectiveVulkan( float fovy, float aspect_ratio, float near, float far, float * out ) {
 	// Vulkan changed its NDC.  It switch from a left handed coordinate system to a right handed one.
 	// +x points to the right, +z points into the screen, +y points down (it used to point in up, in opengl).
-	// It also changed the range from [-1,1] to [0,1]
+	// It also changed the range from [-1,1] to [0,1] for the z.
+	// Clip space remains [-1,1] for x and y.
+	// Check section 23 of the specification.
 #if 1
 	float matVulkan[ 16 ];
 	matVulkan[ 0 ] = 1;

@@ -7,8 +7,8 @@ uniforms
 */
 
 layout( binding = 2 ) uniform sampler2D texDiffuse;
-layout( binding = 3 ) uniform sampler2D texGlossiness;
-layout( binding = 4 ) uniform sampler2D texNormal;
+layout( binding = 3 ) uniform sampler2D texNormal;
+layout( binding = 4 ) uniform sampler2D texGlossiness;
 layout( binding = 5 ) uniform sampler2D texSpecular;
 
 /*
@@ -70,8 +70,8 @@ float GGX( vec3 N, vec3 V, vec3 L, float roughness, float F0 ) {
     float D = DistributionIsotropic( N, H, alpha );
 	
 	// F - Shlick's Approximation for the Fresnel Reflection
-    float F = FresnelShlick( N, V, F0 );
-//    float F = FresnelShlick( L, H, F0 );
+//    float F = FresnelShlick( N, V, F0 );
+    float F = FresnelShlick( L, H, F0 );
 	
 	// V - Smith approximation of the bidirectional shadowing masking
 	float visibility =
@@ -101,18 +101,17 @@ void main() {
     // normal needs to be transformed from texture space to world space
     normal.x = 2.0 * ( normal.x - 0.5 );
     normal.y = 2.0 * ( normal.y - 0.5 );
+    normal = normalize( normal );
 
-    vec3 worldBitangent = cross( worldNormal.xyz, worldTangent.xyz );    // this might be backwards
-//    vec3 worldBitangent = cross( worldTangent.xyz, worldNormal.xyz );    // this might be backwards
+    vec3 worldBitangent = cross( worldNormal.xyz, worldTangent.xyz );
     normal = normal.x * worldTangent.xyz + normal.y * worldBitangent.xyz + normal.z * worldNormal.xyz;
-    normal = worldNormal.xyz;
 
     //vec3 specular;
     specular.r = GGX( normal, dirToCamera, dirToLight, roughness.r, specular.r );
     specular.g = GGX( normal, dirToCamera, dirToLight, roughness.g, specular.g );
     specular.b = GGX( normal, dirToCamera, dirToLight, roughness.b, specular.b );
 
-    float ambient = 0.0;
+    float ambient = 0.1;
     float flux = clamp( dot( normal, dirToLight ), 0.0, 1.0 ) + ambient;
 
     vec4 finalColor;
@@ -122,9 +121,4 @@ void main() {
     finalColor.a = 1.0;
 
     outColor = finalColor;
-//    outColor.rgb = diffuse.rgb * clamp( dot( worldNormal.xyz, dirToLight.xyz ), 0.0, 1.0 );
-    outColor.rgb = worldNormal.xyz;
-    //outColor.rgb = normal.xyz;
-//    outColor.rgb = worldTangent.xyz;
-    //outColor.rgb = dirToCamera.xyz;
 }

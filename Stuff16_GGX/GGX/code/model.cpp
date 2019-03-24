@@ -342,14 +342,14 @@ bool Model::LoadOBJ( const char * localFileName, bool doSwapYZ ) {
 	printf( "max = %f %f %f\n", max.x, max.y, max.z );
 	printf( "----------------------\n" );
 
+	CalculateTangents();
+
 	if ( doSwapYZ ) {
 		for ( int i = 0; i < m_vertices.size(); i++ ) {
 			vert_t & vert = m_vertices[ i ];
 			vert.st[ 1 ] = 1.0f - vert.st[ 1 ];
 		}
 	}
-
-	CalculateTangents();
 
 	// Print normals
 // 	for ( int i = 0; i < m_vertices.size(); i++ ) {
@@ -390,24 +390,56 @@ void Model::CalculateTangents() {
 		Vec2d stA = v0.st;
 		Vec2d stB = v1.st;
 		Vec2d stC = v2.st;
-		Vec2d deltaSTab = stB - stA;
-		Vec2d deltaSTac = stC - stA;
-		deltaSTab.Normalize();
-		deltaSTac.Normalize();
+		Vec2d stAB = stB - stA;
+		Vec2d stAC = stC - stA;
+//		stAB.Normalize();
+//		stAC.Normalize();
 
 		// calculate tangents
 		Vec3d tangent;
+#if 0
+		{
+			//Vec2d stTangent = Vec2d( 1, 0 );
+			// find alpha, beta such that stTangent = alpha * stAB + beta * stAC;
+			// 1 = alpha * stAB.x + beta * stAC.x;
+			// 0 = alpha * stAB.y + beta * stAC.y;
+			// beta = -alpha * stAB.y / stAC.y;
+			// 1 = alpha * stAB.x - alpha * stAB.y / stAC.y * stAC.x;
+			// 1 = alpha * ( stAB.x - stAB.y * stAC.x / stAC.y );
+			// alpha = 1.0f / ( stAB.x - stAB.y * stAC.x / stAC.y );
+			float alpha = 1.0f / ( stAB.x - stAB.y * stAC.x / stAC.y );
+			float beta = -alpha * stAB.y / stAC.y;
+			tangent = alpha * vAB + beta * vAC;
+		}
+#else
 		{
 			Vec3d v1 = vAC;
 			Vec3d v2 = vAB;
-			Vec2d st1 = deltaSTac;
-			Vec2d st2 = deltaSTab;
+			Vec2d st1 = stAC;
+			Vec2d st2 = stAB;
 			float coef = 1.0f / ( st1.x * st2.y - st2.x * st1.y );
 			tangent.x = coef * ( ( v1.x * st2.y ) + ( v2.x * -st1.y ) );
 			tangent.y = coef * ( ( v1.y * st2.y ) + ( v2.y * -st1.y ) );
 			tangent.z = coef * ( ( v1.z * st2.y ) + ( v2.z * -st1.y ) );
 		}
+#endif
 		tangent.Normalize();
+
+		Vec3d normal0 = v0.norm;
+		Vec3d normal1 = v1.norm;
+		Vec3d normal2 = v2.norm;
+
+		Vec3d bitangent0 = normal0.Cross( tangent );
+		Vec3d bitangent1 = normal1.Cross( tangent );
+		Vec3d bitangent2 = normal2.Cross( tangent );
+
+		Vec3d tangent0 = bitangent0.Cross( normal0 );
+		Vec3d tangent1 = bitangent0.Cross( normal1 );
+		Vec3d tangent2 = bitangent0.Cross( normal2 );
+
+		tangent0.Normalize();
+		tangent1.Normalize();
+		tangent2.Normalize();
 
 		// store the tangents
 // 		Vec3dToByte4( tangent, v0.tang );
@@ -418,9 +450,9 @@ void Model::CalculateTangents() {
 		v1.tang[ 3 ] = 0;
 		v2.tang[ 3 ] = 0;
 		for ( int i = 0; i < 3; i++ ) {
-			v0.tang[ i ] = tangent[ i ];
-			v1.tang[ i ] = tangent[ i ];
-			v2.tang[ i ] = tangent[ i ];
+			v0.tang[ i ] = tangent0[ i ];
+			v1.tang[ i ] = tangent1[ i ];
+			v2.tang[ i ] = tangent2[ i ];
 		}
 // 		v0.tang = tangent;
 // 		v1.tang = tangent;

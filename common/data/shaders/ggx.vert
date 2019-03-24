@@ -43,6 +43,16 @@ out gl_PerVertex {
     vec4 gl_Position;
 };
 
+vec3 ExtractPos( in mat4 matrix ) {
+    vec3 pos;
+    pos = -matrix[ 3 ].xyz;
+    //pos.x = -matrix[ 0 ].w;
+    //pos.y = -matrix[ 1 ].w;
+    //pos.z = -matrix[ 2 ].w;
+    pos = vec3( 10, 0, 5 ) * 1.25;  // TODO: Get this function working properly
+    return pos;
+}
+
 /*
 ==========================================
 main
@@ -53,7 +63,7 @@ void main() {
     vec3 tangent = inTangent.xyz;
 
     // Extract the camera position from the view matrix
-    cameraPos = camera.view[ 3 ].xyz;
+    cameraPos = ExtractPos( camera.view );
     worldPos = model.model * vec4( inPosition, 1.0 );
 
     // Get the tangent space in world coordinates
