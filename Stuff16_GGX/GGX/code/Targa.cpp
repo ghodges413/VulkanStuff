@@ -240,9 +240,9 @@ bool Targa::Load( const char * fileName, const bool verbose /* = false */ ) {
 	memcpy( &info, data_ptr, 6 );
 	data_ptr += 6;
 	
-    // if type[ 1 ] is non-zero, there's a color map
-	//  type[ 2 ] either 1 (uncompressed color) or 2 (truevision color) or 3 (greyscale)
-	if ( type[ 1 ] > 1 || ( type[ 2 ] != 1 && type[ 2 ] != 2 && type[ 2 ] != 3 ) ) {
+	// if type[ 1 ] is non-zero, there's a color map
+	//  type[ 2 ] either 2 (color) or 3 (greyscale)
+	if ( type[ 1 ] != 0 || ( type[ 2 ] != 2 && type[ 2 ] != 3 ) ) {
 		free( data );
 		return false;
 	}
