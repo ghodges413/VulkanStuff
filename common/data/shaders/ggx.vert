@@ -59,15 +59,16 @@ main
 ==========================================
 */
 void main() {
-    //vec3 tangent = 2.0 * inTangent.xyz - vec3( 1, 1, 1 );
-    vec3 tangent = inTangent.xyz;
+    vec3 normal = 2.0 * ( inNormal.xyz - vec3( 0.5 ) );
+    vec3 tangent = 2.0 * ( inTangent.xyz - vec3( 0.5 ) );
+    //vec3 tangent = inTangent.xyz;
 
     // Extract the camera position from the view matrix
     cameraPos = ExtractPos( camera.view );
     worldPos = model.model * vec4( inPosition, 1.0 );
 
     // Get the tangent space in world coordinates
-    worldNormal = model.model * vec4( inNormal.xyz, 0.0 );
+    worldNormal = model.model * vec4( normal.xyz, 0.0 );
     worldTangent = model.model * vec4( tangent.xyz, 0.0 );
 
     // Project coordinate to screen

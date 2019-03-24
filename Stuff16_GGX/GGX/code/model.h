@@ -14,10 +14,8 @@ vert_t
 struct vert_t {
 	float			xyz[ 3 ];	// 12 bytes
 	float			st[ 2 ];	// 8 bytes
-//	unsigned char	norm[ 4 ];	// 4 bytes
-	float			norm[ 4 ];
-//	unsigned char	tang[ 4 ];	// 4 bytes
-	float			tang[ 4 ];	// 4 bytes
+	unsigned char	norm[ 4 ];	// 4 bytes
+	unsigned char	tang[ 4 ];	// 4 bytes
 	unsigned char	buff[ 4 ];	// 4 bytes
 
 	static VkVertexInputBindingDescription GetBindingDescription() {
@@ -45,13 +43,11 @@ struct vert_t {
 		attributeDescriptions[ 2 ].binding = 0;
 		attributeDescriptions[ 2 ].location = 2;
 		attributeDescriptions[ 2 ].format = VK_FORMAT_R8G8B8A8_UNORM;
-		attributeDescriptions[ 2 ].format = VK_FORMAT_R32G32B32A32_SFLOAT;
 		attributeDescriptions[ 2 ].offset = offsetof( vert_t, norm );
 
 		attributeDescriptions[ 3 ].binding = 0;
 		attributeDescriptions[ 3 ].location = 3;
 		attributeDescriptions[ 3 ].format = VK_FORMAT_R8G8B8A8_UNORM;
-		attributeDescriptions[ 3 ].format = VK_FORMAT_R32G32B32A32_SFLOAT;
 		attributeDescriptions[ 3 ].offset = offsetof( vert_t, tang );
 
 		attributeDescriptions[ 4 ].binding = 0;

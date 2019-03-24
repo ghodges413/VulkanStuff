@@ -29,6 +29,36 @@ unsigned char FloatToByte_01( const float f ) {
 	return (unsigned char)i;
 }
 
+Vec3d Byte4ToVec3d( const unsigned char * data ) {
+	Vec3d pt;
+	pt.x = float( data[ 0 ] ) / 255.0f;	// 0,1
+	pt.y = float( data[ 1 ] ) / 255.0f;	// 0,1
+	pt.z = float( data[ 2 ] ) / 255.0f;	// 0,1
+
+	pt.x = 2.0f * ( pt.x - 0.5f ); //-1,1
+	pt.y = 2.0f * ( pt.y - 0.5f ); //-1,1
+	pt.z = 2.0f * ( pt.z - 0.5f ); //-1,1
+	return pt;
+}
+
+void Vec3dToFloat3( const Vec3d & v, float * f ) {
+	f[ 0 ] = v.x;
+	f[ 1 ] = v.y;
+	f[ 2 ] = v.z;
+}
+void Vec2dToFloat2( const Vec2d & v, float * f ) {
+	f[ 0 ] = v.x;
+	f[ 1 ] = v.y;
+}
+void Vec3dToByte4( const Vec3d & v, unsigned char * b ) {
+	Vec3d tmp = v;
+	tmp.Normalize();
+	b[ 0 ] = FloatToByte_n11( tmp.x );
+	b[ 1 ] = FloatToByte_n11( tmp.y );
+	b[ 2 ] = FloatToByte_n11( tmp.z );
+	b[ 3 ] = 0;
+}
+
 /*
 ====================================================
 FillFullScreenQuad
@@ -173,22 +203,6 @@ void FillCube( Model & model ) {
 	}
 }
 
-void Vec3dToFloat3( const Vec3d & v, float * f ) {
-	f[ 0 ] = v.x;
-	f[ 1 ] = v.y;
-	f[ 2 ] = v.z;
-}
-void Vec2dToFloat2( const Vec2d & v, float * f ) {
-	f[ 0 ] = v.x;
-	f[ 1 ] = v.y;
-}
-void Vec3dToByte4( const Vec3d & v, unsigned char * b ) {
-	b[ 0 ] = FloatToByte_n11( v.x );
-	b[ 1 ] = FloatToByte_n11( v.y );
-	b[ 2 ] = FloatToByte_n11( v.z );
-	b[ 3 ] = 0;
-}
-
 /*
 ====================================================
 Model::LoadOBJ
@@ -237,11 +251,11 @@ bool Model::LoadOBJ( const char * localFileName, bool doSwapYZ ) {
 			vert_t vert[ 4 ];
 			for ( int it = 0; it < 4; ++it ) {
 				Vec3dToFloat3( mPositions[ i[ it ] - 1 ], vert[ it ].xyz );
-				//Vec3dToByte4( mNormals[ k[ it ] - 1 ], vert[ it ].norm );
-				vert[ it ].norm[ 0 ] = mNormals[ k[ it ] - 1 ][ 0 ];
-				vert[ it ].norm[ 1 ] = mNormals[ k[ it ] - 1 ][ 1 ];
-				vert[ it ].norm[ 2 ] = mNormals[ k[ it ] - 1 ][ 2 ];
-				vert[ it ].norm[ 3 ] = 0.0f;
+				Vec3dToByte4( mNormals[ k[ it ] - 1 ], vert[ it ].norm );
+// 				vert[ it ].norm[ 0 ] = mNormals[ k[ it ] - 1 ][ 0 ];
+// 				vert[ it ].norm[ 1 ] = mNormals[ k[ it ] - 1 ][ 1 ];
+// 				vert[ it ].norm[ 2 ] = mNormals[ k[ it ] - 1 ][ 2 ];
+// 				vert[ it ].norm[ 3 ] = 0.0f;
 				Vec2dToFloat2( mST[ j[ it ] - 1 ], vert[ it ].st );
 			}
 			m_vertices.push_back( vert[ 0 ] );
@@ -256,11 +270,11 @@ bool Model::LoadOBJ( const char * localFileName, bool doSwapYZ ) {
 			vert_t vert[ 3 ];
 			for ( int it = 0; it < 3; ++it ) {
 				Vec3dToFloat3( mPositions[ i[ it ] - 1 ], vert[ it ].xyz );
-				//Vec3dToByte4( mNormals[ k[ it ] - 1 ], vert[ it ].norm );
-				vert[ it ].norm[ 0 ] = mNormals[ k[ it ] - 1 ][ 0 ];
-				vert[ it ].norm[ 1 ] = mNormals[ k[ it ] - 1 ][ 1 ];
-				vert[ it ].norm[ 2 ] = mNormals[ k[ it ] - 1 ][ 2 ];
-				vert[ it ].norm[ 3 ] = 0.0f;
+				Vec3dToByte4( mNormals[ k[ it ] - 1 ], vert[ it ].norm );
+// 				vert[ it ].norm[ 0 ] = mNormals[ k[ it ] - 1 ][ 0 ];
+// 				vert[ it ].norm[ 1 ] = mNormals[ k[ it ] - 1 ][ 1 ];
+// 				vert[ it ].norm[ 2 ] = mNormals[ k[ it ] - 1 ][ 2 ];
+// 				vert[ it ].norm[ 3 ] = 0.0f;
 				Vec2dToFloat2( mST[ j[ it ] - 1 ], vert[ it ].st );
 			}
 			m_vertices.push_back( vert[ 0 ] );
@@ -280,11 +294,11 @@ bool Model::LoadOBJ( const char * localFileName, bool doSwapYZ ) {
 			Vec3d norm = b.Cross( a );
 			norm.Normalize();
 			for ( int it = 0; it < 4; ++it ) {
-				//Vec3dToByte4( norm, vert[ it ].norm );
-				vert[ it ].norm[ 0 ] = norm[ 0 ];
-				vert[ it ].norm[ 1 ] = norm[ 1 ];
-				vert[ it ].norm[ 2 ] = norm[ 2 ];
-				vert[ it ].norm[ 3 ] = 0.0f;
+				Vec3dToByte4( norm, vert[ it ].norm );
+// 				vert[ it ].norm[ 0 ] = norm[ 0 ];
+// 				vert[ it ].norm[ 1 ] = norm[ 1 ];
+// 				vert[ it ].norm[ 2 ] = norm[ 2 ];
+// 				vert[ it ].norm[ 3 ] = 0.0f;
 			}
 
 			m_vertices.push_back( vert[ 0 ] );
@@ -308,11 +322,11 @@ bool Model::LoadOBJ( const char * localFileName, bool doSwapYZ ) {
 			Vec3d norm = b.Cross( a );
 			norm.Normalize();
 			for ( int it = 0; it < 3; ++it ) {
-				//Vec3dToByte4( norm, vert[ it ].norm );
-				vert[ it ].norm[ 0 ] = norm[ 0 ];
-				vert[ it ].norm[ 1 ] = norm[ 1 ];
-				vert[ it ].norm[ 2 ] = norm[ 2 ];
-				vert[ it ].norm[ 3 ] = 0.0f;
+				Vec3dToByte4( norm, vert[ it ].norm );
+// 				vert[ it ].norm[ 0 ] = norm[ 0 ];
+// 				vert[ it ].norm[ 1 ] = norm[ 1 ];
+// 				vert[ it ].norm[ 2 ] = norm[ 2 ];
+// 				vert[ it ].norm[ 3 ] = 0.0f;
 			}
 
 			m_vertices.push_back( vert[ 0 ] );
@@ -351,12 +365,6 @@ bool Model::LoadOBJ( const char * localFileName, bool doSwapYZ ) {
 		}
 	}
 
-	// Print normals
-// 	for ( int i = 0; i < m_vertices.size(); i++ ) {
-// 		const vert_t & vert = m_vertices[ i ];
-// 		printf( "%i: %f %f %f\n", i, vert.norm[ 0 ], vert.norm[ 1 ], vert.norm[ 2 ] );
-// 	}
-
 	// Build the index list.  Something we should do in the future is optimize it
 	// so that we don't duplicate vertex data
 
@@ -378,27 +386,24 @@ void Model::CalculateTangents() {
 		vert_t & v1 = m_vertices[ i + 1 ];
 		vert_t & v2 = m_vertices[ i + 2 ];
 
-		// grab the vertices to the triangle
-		Vec3d vA = v0.xyz;
-		Vec3d vB = v1.xyz;
-		Vec3d vC = v2.xyz;
-
-		Vec3d vAB = vB - vA;
-		Vec3d vAC = vC - vA;
-
-		// get the ST mapping values for the triangle
-		Vec2d stA = v0.st;
-		Vec2d stB = v1.st;
-		Vec2d stC = v2.st;
-		Vec2d stAB = stB - stA;
-		Vec2d stAC = stC - stA;
-//		stAB.Normalize();
-//		stAC.Normalize();
-
 		// calculate tangents
 		Vec3d tangent;
-#if 0
 		{
+			// grab the vertices to the triangle
+			Vec3d vA = v0.xyz;
+			Vec3d vB = v1.xyz;
+			Vec3d vC = v2.xyz;
+
+			Vec3d vAB = vB - vA;
+			Vec3d vAC = vC - vA;
+
+			// get the ST mapping values for the triangle
+			Vec2d stA = v0.st;
+			Vec2d stB = v1.st;
+			Vec2d stC = v2.st;
+			Vec2d stAB = stB - stA;
+			Vec2d stAC = stC - stA;
+
 			//Vec2d stTangent = Vec2d( 1, 0 );
 			// find alpha, beta such that stTangent = alpha * stAB + beta * stAC;
 			// 1 = alpha * stAB.x + beta * stAC.x;
@@ -407,27 +412,20 @@ void Model::CalculateTangents() {
 			// 1 = alpha * stAB.x - alpha * stAB.y / stAC.y * stAC.x;
 			// 1 = alpha * ( stAB.x - stAB.y * stAC.x / stAC.y );
 			// alpha = 1.0f / ( stAB.x - stAB.y * stAC.x / stAC.y );
-			float alpha = 1.0f / ( stAB.x - stAB.y * stAC.x / stAC.y );
-			float beta = -alpha * stAB.y / stAC.y;
-			tangent = alpha * vAB + beta * vAC;
-		}
-#else
-		{
-			Vec3d v1 = vAC;
-			Vec3d v2 = vAB;
-			Vec2d st1 = stAC;
-			Vec2d st2 = stAB;
-			float coef = 1.0f / ( st1.x * st2.y - st2.x * st1.y );
-			tangent.x = coef * ( ( v1.x * st2.y ) + ( v2.x * -st1.y ) );
-			tangent.y = coef * ( ( v1.y * st2.y ) + ( v2.y * -st1.y ) );
-			tangent.z = coef * ( ( v1.z * st2.y ) + ( v2.z * -st1.y ) );
-		}
-#endif
-		tangent.Normalize();
+			//float alpha = 1.0f / ( stAB.x - stAB.y * stAC.x / stAC.y );
+			//float beta = -alpha * stAB.y / stAC.y;
+			//tangent = alpha * vAB + beta * vAC;
 
-		Vec3d normal0 = v0.norm;
-		Vec3d normal1 = v1.norm;
-		Vec3d normal2 = v2.norm;
+			float invDenom = 1.0f / ( stAB.x * stAC.y - stAB.y * stAC.x );
+			float alpha = stAC.y * invDenom;
+			float beta = -stAB.y * invDenom;
+			tangent = alpha * vAB + beta * vAC;
+			tangent.Normalize();
+		}
+
+		Vec3d normal0 = Byte4ToVec3d( v0.norm );
+		Vec3d normal1 = Byte4ToVec3d( v1.norm );
+		Vec3d normal2 = Byte4ToVec3d( v2.norm );
 
 		Vec3d bitangent0 = normal0.Cross( tangent );
 		Vec3d bitangent1 = normal1.Cross( tangent );
@@ -441,21 +439,8 @@ void Model::CalculateTangents() {
 		tangent1.Normalize();
 		tangent2.Normalize();
 
-		// store the tangents
-// 		Vec3dToByte4( tangent, v0.tang );
-// 		Vec3dToByte4( tangent, v1.tang );
-// 		Vec3dToByte4( tangent, v2.tang );
-
-		v0.tang[ 3 ] = 0;
-		v1.tang[ 3 ] = 0;
-		v2.tang[ 3 ] = 0;
-		for ( int i = 0; i < 3; i++ ) {
-			v0.tang[ i ] = tangent0[ i ];
-			v1.tang[ i ] = tangent1[ i ];
-			v2.tang[ i ] = tangent2[ i ];
-		}
-// 		v0.tang = tangent;
-// 		v1.tang = tangent;
-// 		v2.tang = tangent;
+		Vec3dToByte4( tangent0, v0.tang );
+		Vec3dToByte4( tangent1, v1.tang );
+		Vec3dToByte4( tangent2, v2.tang );
 	}
 }
