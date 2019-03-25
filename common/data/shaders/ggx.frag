@@ -70,8 +70,8 @@ float GGX( vec3 N, vec3 V, vec3 L, float roughness, float F0 ) {
     float D = DistributionIsotropic( N, H, alpha );
 	
 	// F - Shlick's Approximation for the Fresnel Reflection
-//    float F = FresnelShlick( N, V, F0 );
-    float F = FresnelShlick( L, H, F0 );
+//    float F = FresnelShlick( N, V, F0 );  // These are equivalent
+    float F = FresnelShlick( L, H, F0 );    // These are equivalent
 	
 	// V - Smith approximation of the bidirectional shadowing masking
 	float visibility =
@@ -84,6 +84,48 @@ float GGX( vec3 N, vec3 V, vec3 L, float roughness, float F0 ) {
 
 /*
 ==========================================
+GammaToLinearSpace
+for reference https://en.wikipedia.org/wiki/SRGB
+==========================================
+*/
+float GammaToLinearSpace( in float gamma ) {
+    if ( gamma < 0.04045 ) {
+        return ( gamma / 12.92 );
+    }
+
+    return pow( ( gamma + 0.055 ) / 1.055, 2.4 );
+}
+vec3 GammaToLinearSpace( in vec3 gamma ) {
+    vec3 linear;
+    linear.r = GammaToLinearSpace( gamma.r );
+    linear.g = GammaToLinearSpace( gamma.g );
+    linear.b = GammaToLinearSpace( gamma.b );
+    return linear;
+}
+
+/*
+==========================================
+LinearToGammaSpace
+for reference https://en.wikipedia.org/wiki/SRGB
+==========================================
+*/
+float LinearToGammaSpace( in float linear ) {
+    if ( linear < 0.0031308 ) {
+        return ( 12.92 * linear );
+    }
+
+    return ( pow( linear, 1.0 / 2.4 ) * 1.055 - 0.055 );
+}
+vec3 LinearToGammaSpace( in vec3 linear ) {
+    vec3 gamma;
+    gamma.r = LinearToGammaSpace( linear.r );
+    gamma.g = LinearToGammaSpace( linear.g );
+    gamma.b = LinearToGammaSpace( linear.b );
+    return gamma;
+}
+
+/*
+==========================================
 main
 ==========================================
 */
@@ -92,10 +134,11 @@ void main() {
     vec3 dirToCamera = normalize( cameraPos - worldPos.xyz );
 
     vec3 diffuse = texture( texDiffuse, fragTexCoord ).rgb;
-    vec3 gloss = texture( texGlossiness, fragTexCoord ).rgb;
     vec3 normal = texture( texNormal, fragTexCoord ).xyz;
+    vec3 gloss = texture( texGlossiness, fragTexCoord ).rgb;
     vec3 specular = texture( texSpecular, fragTexCoord ).rgb;
 
+    //diffuse = GammaToLinearSpace( diffuse );
     vec3 roughness = vec3( 1, 1, 1 ) - gloss;
 
     // normal needs to be transformed from texture space to world space
@@ -106,7 +149,6 @@ void main() {
     vec3 worldBitangent = cross( worldNormal.xyz, worldTangent.xyz );
     normal = normal.x * worldTangent.xyz + normal.y * worldBitangent.xyz + normal.z * worldNormal.xyz;
 
-    //vec3 specular;
     specular.r = GGX( normal, dirToCamera, dirToLight, roughness.r, specular.r );
     specular.g = GGX( normal, dirToCamera, dirToLight, roughness.g, specular.g );
     specular.b = GGX( normal, dirToCamera, dirToLight, roughness.b, specular.b );
