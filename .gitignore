@@ -39,7 +39,7 @@
 *.opensdf
 *.user
 *.filters
-*.vcxproj
+#*.vcxproj
 
 # GLSLANG libs because github has a 100mb file limit
 **/glslang/lib
