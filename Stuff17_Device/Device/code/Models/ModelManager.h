@@ -6,8 +6,8 @@
 #include <vulkan/vulkan.h>
 #include <vector>
 #include <array>
-#include "DeviceContext.h"
-#include "Buffer.h"
+#include "Graphics/DeviceContext.h"
+#include "Graphics/Buffer.h"
 #include "Math/Vector.h"
 #include "Math/Quat.h"
 

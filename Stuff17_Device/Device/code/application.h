@@ -18,8 +18,8 @@
 #include <set>
 
 #include "Math/Vector.h"
-#include "DeviceContext.h"
-#include "Buffer.h"
+#include "Graphics/DeviceContext.h"
+#include "Graphics/Buffer.h"
 
 class Texture;
 

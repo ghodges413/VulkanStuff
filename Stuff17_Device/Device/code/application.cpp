@@ -2,12 +2,12 @@
 //  application.cpp
 //
 #include "application.h"
-#include "Texture.h"
+#include "Graphics/Texture.h"
 #include "Models/ModelManager.h"
 #include "Models/ModelStatic.h"
-#include "Samplers.h"
-#include "shader.h"
-#include "Fileio.h"
+#include "Graphics/Samplers.h"
+#include "Graphics/shader.h"
+#include "Miscellaneous/Fileio.h"
 #include <assert.h>
 
 Application * g_application = NULL;

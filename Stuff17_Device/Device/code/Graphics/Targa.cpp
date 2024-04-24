@@ -3,8 +3,8 @@
  *
  */
 #include <stdio.h>
-#include "Targa.h"
-#include "Fileio.h"
+#include "Graphics/Targa.h"
+#include "Miscellaneous/Fileio.h"
 #include <assert.h>
 #include <errno.h>
 #include <string>
