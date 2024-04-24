@@ -20,28 +20,44 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="code\application.cpp" />
+    <ClCompile Include="code\Barrier.cpp" />
+    <ClCompile Include="code\Buffer.cpp" />
     <ClCompile Include="code\DeviceContext.cpp" />
     <ClCompile Include="code\Fence.cpp" />
     <ClCompile Include="code\Fileio.cpp" />
+    <ClCompile Include="code\FrameBuffer.cpp" />
+    <ClCompile Include="code\Image.cpp" />
     <ClCompile Include="code\main.cpp" />
-    <ClCompile Include="code\model.cpp" />
+    <ClCompile Include="code\Math\Matrix.cpp" />
+    <ClCompile Include="code\Models\ModelManager.cpp" />
+    <ClCompile Include="code\Models\ModelOBJ.cpp" />
+    <ClCompile Include="code\Models\ModelStatic.cpp" />
+    <ClCompile Include="code\Samplers.cpp" />
     <ClCompile Include="code\shader.cpp" />
     <ClCompile Include="code\SwapChain.cpp" />
     <ClCompile Include="code\Targa.cpp" />
     <ClCompile Include="code\Texture.cpp" />
-    <ClCompile Include="code\Vector.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="code\application.h" />
+    <ClInclude Include="code\Barrier.h" />
+    <ClInclude Include="code\Buffer.h" />
     <ClInclude Include="code\DeviceContext.h" />
     <ClInclude Include="code\Fence.h" />
     <ClInclude Include="code\Fileio.h" />
-    <ClInclude Include="code\model.h" />
+    <ClInclude Include="code\FrameBuffer.h" />
+    <ClInclude Include="code\Image.h" />
+    <ClInclude Include="code\Math\Matrix.h" />
+    <ClInclude Include="code\Math\Quat.h" />
+    <ClInclude Include="code\Math\Vector.h" />
+    <ClInclude Include="code\Models\ModelManager.h" />
+    <ClInclude Include="code\Models\ModelOBJ.h" />
+    <ClInclude Include="code\Models\ModelStatic.h" />
+    <ClInclude Include="code\Samplers.h" />
     <ClInclude Include="code\shader.h" />
     <ClInclude Include="code\SwapChain.h" />
     <ClInclude Include="code\Targa.h" />
     <ClInclude Include="code\Texture.h" />
-    <ClInclude Include="code\Vector.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>15.0</VCProjectVersion>
@@ -126,7 +142,7 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>..\..\common\libs\vulkan_1.1.97.0\Include;..\..\common\libs\glfw-3.2.1.bin.WIN64\include;..\..\common\libs\glslang\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>code;..\..\common\libs\vulkan_1.1.97.0\Include;..\..\common\libs\glfw-3.2.1.bin.WIN64\include;..\..\common\libs\glslang\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -159,7 +175,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>..\..\common\libs\vulkan_1.1.97.0\Include;..\..\common\libs\glfw-3.2.1.bin.WIN64\include;..\..\common\libs\glslang\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>code;..\..\common\libs\vulkan_1.1.97.0\Include;..\..\common\libs\glfw-3.2.1.bin.WIN64\include;..\..\common\libs\glslang\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>

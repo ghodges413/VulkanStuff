@@ -17,7 +17,9 @@
 #include <array>
 #include <set>
 
-#include "Vector.h"
+#include "Math/Vector.h"
+#include "DeviceContext.h"
+#include "Buffer.h"
 
 class Texture;
 
@@ -48,9 +50,9 @@ struct QueueFamilyIndices {
 };
 
 struct Entity_t {
-	Vec3d pos;
-	Vec3d fwd;
-	Vec3d up;
+	Vec3 pos;
+	Vec3 fwd;
+	Vec3 up;
 };
 
 /*
@@ -72,69 +74,21 @@ private:
 	VkInstance m_vkInstance;
 	VkDebugReportCallbackEXT m_vkDebugCallback;
 
-	VkSurfaceKHR m_vkSurface;
-
 	//
 	//	Device related
 	//
-	VkPhysicalDevice m_vkPhysicalDevice;
-	VkDevice m_vkDevice;
-
-	VkQueue m_vkGraphicsQueue;
-	VkQueue m_vkPresentQueue;
-
-	//
-	//	Swap chain related
-	//
-	VkSwapchainKHR m_vkSwapChain;
-	VkExtent2D m_vkSwapChainExtent;
-
-	VkFormat m_vkSwapChainColorImageFormat;
-	std::vector< VkImage > m_vkSwapChainColorImages;
-	std::vector< VkImageView > m_vkSwapChainImageViews;
-
-	VkFormat m_vkSwapChainDepthFormat;
-	VkImage m_vkSwapChainDepthImage;
-	VkImageView m_vkSwapChainDepthImageView;
-	VkDeviceMemory m_vkSwapChainDepthImageMemory;
-	
-	std::vector< VkFramebuffer > m_vkSwapChainFramebuffers;
-
-	VkRenderPass m_vkRenderPass;
+	DeviceContext m_device;
 
 	//
 	//	Uniform Buffer
 	//
-	VkBuffer m_vkUniformBuffer;
-	VkDeviceMemory m_vkUniformBufferMemory;
-	VkDeviceSize m_vkUniformBufferSize;
-
-	//
-	//	Command Buffers
-	//
-	VkCommandPool m_vkCommandPool;
-	std::vector< VkCommandBuffer > m_vkCommandBuffers;
+	Buffer m_uniformBuffer;
 
 	//
 	//	Texture loaded from file
 	//
 	static const int m_numTextures = 4;
 	Texture * m_texture[ m_numTextures ];
-
-	//
-	//	Model
-	//
-	int m_numModelIndices;
-	VkBuffer m_vkVertexBuffer;
-	VkDeviceMemory m_vkVertexBufferMemory;
-	VkBuffer m_vkIndexBuffer;
-	VkDeviceMemory m_vkIndexBufferMemory;
-
-	//
-	//	Shader Modules
-	//
-	VkShaderModule m_vkShaderModuleVert;
-	VkShaderModule m_vkShaderModuleFrag;
 
 	//
 	//	Descriptor Sets
@@ -150,12 +104,6 @@ private:
 	VkPipelineLayout m_vkPipelineLayout;
 	VkPipeline m_vkPipeline;
 
-	//
-	//	Semaphores
-	//
-	VkSemaphore m_vkImageAvailableSemaphore;
-	VkSemaphore m_vkRenderFinishedSemaphore;
-
 	std::vector< Entity_t > m_entities;
 
 	bool CheckValidationLayerSupport() const;
@@ -163,7 +111,6 @@ private:
 
 	void InitializeGLFW();
 	bool InitializeVulkan();
-	bool CreateSwapChain( int windowWidth, int windowHeight );
 	bool CreatePipeline( int windowWidth, int windowHeight );
 	void Cleanup();
 	void DrawFrame();
@@ -173,18 +120,6 @@ private:
 	static void OnWindowResized( GLFWwindow * window, int width, int height );
 	static VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback( VkDebugReportFlagsEXT flags, VkDebugReportObjectTypeEXT objType, uint64_t obj, size_t location, int32_t code, const char * layerPrefix, const char * msg, void * userData );
 
-	// Device related
-	static bool CheckDeviceExtensionSupport( VkPhysicalDevice vkPhysicalDevice );
-	static QueueFamilyIndices FindQueueFamilies( VkPhysicalDevice vkPhysicalDevice, VkSurfaceKHR vkSurface );
-	static bool IsDeviceSuitable( VkPhysicalDevice vkPhysicalDevice, VkSurfaceKHR vkSurface );
-	static SwapChainSupportDetails QuerySwapChainSupport( VkPhysicalDevice device, VkSurfaceKHR vkSurface );
-
-	// Swap chain related
-	static VkSurfaceFormatKHR ChooseSwapSurfaceFormat( const std::vector<VkSurfaceFormatKHR> & availableFormats );
-	static VkPresentModeKHR ChooseSwapPresentMode( const std::vector< VkPresentModeKHR > availablePresentModes );
-	static VkExtent2D ChooseSwapExtent( const VkSurfaceCapabilitiesKHR & capabilities, uint32_t width, uint32_t height );
-public:
-	uint32_t FindMemoryType( uint32_t typeFilter, VkMemoryPropertyFlags properties );
 private:
 
 

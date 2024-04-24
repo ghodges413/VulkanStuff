@@ -2,24 +2,22 @@
 //  Texture.cpp
 //
 #include "Texture.h"
+#include "Samplers.h"
 #include "Targa.h"
 #include "Fileio.h"
 #include "application.h"
 #include <assert.h>
 #include <stdio.h>
 
-//extern uint32_t FindMemoryType( VkPhysicalDevice vkPhysicalDevice, uint32_t typeFilter, VkMemoryPropertyFlags properties );
-
 /*
 ====================================================
 Texture::Cleanup
 ====================================================
 */
-void Texture::Cleanup( VkDevice vkDevice ) {
-	vkDestroySampler( vkDevice, m_vkTextureSampler, nullptr );
-	vkDestroyImageView( vkDevice, m_vkTextureImageView, nullptr );
-	vkDestroyImage( vkDevice, m_vkTextureImage, nullptr );
-	vkFreeMemory( vkDevice, m_vkTextureDeviceMemory, nullptr );
+void Texture::Cleanup( DeviceContext & deviceContext ) {
+	vkDestroyImageView( deviceContext.m_vkDevice, m_vkTextureImageView, nullptr );
+	vkDestroyImage( deviceContext.m_vkDevice, m_vkTextureImage, nullptr );
+	vkFreeMemory( deviceContext.m_vkDevice, m_vkTextureDeviceMemory, nullptr );
 }
 
 /*
@@ -27,8 +25,9 @@ void Texture::Cleanup( VkDevice vkDevice ) {
 Texture::LoadFromFile
 ====================================================
 */
-bool Texture::LoadFromFile( VkDevice vkDevice, VkQueue vkGraphicsQueue, VkCommandBuffer vkCommandBuffer, const char * fileName ) {
+bool Texture::LoadFromFile( DeviceContext & deviceContext, const char * fileName ) {
 	m_vkTextureFormat = VkFormat::VK_FORMAT_R8G8B8A8_UNORM;
+	VkCommandBuffer & vkCommandBuffer = deviceContext.m_vkCommandBuffers[ 0 ];
 
 	Targa targaImage;
 	const bool didLoad = targaImage.Load( fileName, true );
@@ -54,7 +53,7 @@ bool Texture::LoadFromFile( VkDevice vkDevice, VkQueue vkGraphicsQueue, VkComman
 			bufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
 			bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-			VkResult result = vkCreateBuffer( vkDevice, &bufferInfo, nullptr, &stagingBuffer );
+			VkResult result = vkCreateBuffer( deviceContext.m_vkDevice, &bufferInfo, nullptr, &stagingBuffer );
 			if ( VK_SUCCESS != result ) {
 				printf( "failed to create buffer!\n" );
 				assert( 0 );
@@ -62,28 +61,28 @@ bool Texture::LoadFromFile( VkDevice vkDevice, VkQueue vkGraphicsQueue, VkComman
 			}
 
 			VkMemoryRequirements memRequirements;
-			vkGetBufferMemoryRequirements( vkDevice, stagingBuffer, &memRequirements );
+			vkGetBufferMemoryRequirements( deviceContext.m_vkDevice, stagingBuffer, &memRequirements );
 
 			VkMemoryAllocateInfo allocInfo = {};
 			allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 			allocInfo.allocationSize = memRequirements.size;
-			allocInfo.memoryTypeIndex = g_application->FindMemoryType( memRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT );
+			allocInfo.memoryTypeIndex = deviceContext.FindMemoryTypeIndex( memRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT );
 
-			result = vkAllocateMemory( vkDevice, &allocInfo, nullptr, &stagingBufferMemory );
+			result = vkAllocateMemory( deviceContext.m_vkDevice, &allocInfo, nullptr, &stagingBufferMemory );
 			if ( VK_SUCCESS != result ) {
 				printf( "failed to allocate buffer memory!\n" );
 				assert( 0 );
 				return false;
 			}
 
-			vkBindBufferMemory( vkDevice, stagingBuffer, stagingBufferMemory, 0 );
+			vkBindBufferMemory( deviceContext.m_vkDevice, stagingBuffer, stagingBufferMemory, 0 );
 		}
 
 		// Map the staging buffer and copy the texture data
 		void * data = NULL;
-		vkMapMemory( vkDevice, stagingBufferMemory, 0, imageSize, 0, &data );
+		vkMapMemory( deviceContext.m_vkDevice, stagingBufferMemory, 0, imageSize, 0, &data );
 		memcpy( data, targaImage.DataPtr(), static_cast< size_t >( imageSize ) );
-		vkUnmapMemory( vkDevice, stagingBufferMemory );
+		vkUnmapMemory( deviceContext.m_vkDevice, stagingBufferMemory );
 
 		// Create the image
 		{
@@ -102,7 +101,7 @@ bool Texture::LoadFromFile( VkDevice vkDevice, VkQueue vkGraphicsQueue, VkComman
 			imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
 			imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-			VkResult result = vkCreateImage( vkDevice, &imageInfo, nullptr, &m_vkTextureImage );
+			VkResult result = vkCreateImage( deviceContext.m_vkDevice, &imageInfo, nullptr, &m_vkTextureImage );
 			if ( VK_SUCCESS != result ) {
 				printf( "failed to create image!\n" );
 				assert( 0 );
@@ -110,21 +109,21 @@ bool Texture::LoadFromFile( VkDevice vkDevice, VkQueue vkGraphicsQueue, VkComman
 			}
 
 			VkMemoryRequirements memRequirements;
-			vkGetImageMemoryRequirements( vkDevice, m_vkTextureImage, &memRequirements );
+			vkGetImageMemoryRequirements( deviceContext.m_vkDevice, m_vkTextureImage, &memRequirements );
 
 			VkMemoryAllocateInfo allocInfo = {};
 			allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 			allocInfo.allocationSize = memRequirements.size;
-			allocInfo.memoryTypeIndex = g_application->FindMemoryType( memRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
+			allocInfo.memoryTypeIndex = deviceContext.FindMemoryTypeIndex( memRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
 
-			result = vkAllocateMemory( vkDevice, &allocInfo, nullptr, &m_vkTextureDeviceMemory );
+			result = vkAllocateMemory( deviceContext.m_vkDevice, &allocInfo, nullptr, &m_vkTextureDeviceMemory );
 			if ( VK_SUCCESS != result ) {
 				printf( "failed to allocate image memory!\n" );
 				assert( 0 );
 				return false;
 			}
 
-			vkBindImageMemory( vkDevice, m_vkTextureImage, m_vkTextureDeviceMemory, 0 );
+			vkBindImageMemory( deviceContext.m_vkDevice, m_vkTextureImage, m_vkTextureDeviceMemory, 0 );
 		}
 
 		// Transition the image layout
@@ -171,8 +170,8 @@ bool Texture::LoadFromFile( VkDevice vkDevice, VkQueue vkGraphicsQueue, VkComman
 			submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 			submitInfo.commandBufferCount = 1;
 			submitInfo.pCommandBuffers = &vkCommandBuffer;
-			vkQueueSubmit( vkGraphicsQueue, 1, &submitInfo, VK_NULL_HANDLE );
-			vkQueueWaitIdle( vkGraphicsQueue );
+			vkQueueSubmit( deviceContext.m_vkGraphicsQueue, 1, &submitInfo, VK_NULL_HANDLE );
+			vkQueueWaitIdle( deviceContext.m_vkGraphicsQueue );
 		}
 
 		// Copy the buffer into the image
@@ -205,8 +204,8 @@ bool Texture::LoadFromFile( VkDevice vkDevice, VkQueue vkGraphicsQueue, VkComman
 			submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 			submitInfo.commandBufferCount = 1;
 			submitInfo.pCommandBuffers = &vkCommandBuffer;
-			vkQueueSubmit( vkGraphicsQueue, 1, &submitInfo, VK_NULL_HANDLE );
-			vkQueueWaitIdle( vkGraphicsQueue );
+			vkQueueSubmit( deviceContext.m_vkGraphicsQueue, 1, &submitInfo, VK_NULL_HANDLE );
+			vkQueueWaitIdle( deviceContext.m_vkGraphicsQueue );
 		}
 
 		// Transition the image layout
@@ -253,12 +252,12 @@ bool Texture::LoadFromFile( VkDevice vkDevice, VkQueue vkGraphicsQueue, VkComman
 			submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 			submitInfo.commandBufferCount = 1;
 			submitInfo.pCommandBuffers = &vkCommandBuffer;
-			vkQueueSubmit( vkGraphicsQueue, 1, &submitInfo, VK_NULL_HANDLE );
-			vkQueueWaitIdle( vkGraphicsQueue );
+			vkQueueSubmit( deviceContext.m_vkGraphicsQueue, 1, &submitInfo, VK_NULL_HANDLE );
+			vkQueueWaitIdle( deviceContext.m_vkGraphicsQueue );
 		}
 
-		vkDestroyBuffer( vkDevice, stagingBuffer, nullptr );
-		vkFreeMemory( vkDevice, stagingBufferMemory, nullptr );
+		vkDestroyBuffer( deviceContext.m_vkDevice, stagingBuffer, nullptr );
+		vkFreeMemory( deviceContext.m_vkDevice, stagingBufferMemory, nullptr );
 	}
 
 	// Create Image View
@@ -274,7 +273,7 @@ bool Texture::LoadFromFile( VkDevice vkDevice, VkQueue vkGraphicsQueue, VkComman
 		viewInfo.subresourceRange.baseArrayLayer = 0;
 		viewInfo.subresourceRange.layerCount = 1;
 
-		VkResult result = vkCreateImageView( vkDevice, &viewInfo, nullptr, &m_vkTextureImageView );
+		VkResult result = vkCreateImageView( deviceContext.m_vkDevice, &viewInfo, nullptr, &m_vkTextureImageView );
 		if ( VK_SUCCESS != result ) {
 			printf( "failed to create texture image view!\n" );
 			assert( 0 );
@@ -282,29 +281,133 @@ bool Texture::LoadFromFile( VkDevice vkDevice, VkQueue vkGraphicsQueue, VkComman
 		}
 	}
 
-	// Create Sampler
-	{
-		VkSamplerCreateInfo samplerInfo = {};
-		samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-		samplerInfo.magFilter = VK_FILTER_LINEAR;
-		samplerInfo.minFilter = VK_FILTER_LINEAR;
-		samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-		samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-		samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-		samplerInfo.anisotropyEnable = VK_TRUE;
-		samplerInfo.maxAnisotropy = 16;
-		samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
-		samplerInfo.unnormalizedCoordinates = VK_FALSE;
-		samplerInfo.compareEnable = VK_FALSE;
-		samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
-		samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+	return true;
+}
 
-		VkResult result = vkCreateSampler( vkDevice, &samplerInfo, nullptr, &m_vkTextureSampler );
-		if ( VK_SUCCESS != result ) {
-			assert( 0 );
-			return false;
-		}
+/*
+====================================================
+Texture::SetImageLayout
+====================================================
+*/
+void Texture::SetImageLayout(
+	VkCommandBuffer cmdbuffer,
+	VkImage image,
+	VkImageLayout oldImageLayout,
+	VkImageLayout newImageLayout,
+	VkImageSubresourceRange subresourceRange,
+	VkPipelineStageFlags srcStageMask,
+	VkPipelineStageFlags dstStageMask)
+{
+	// Create an image barrier object
+	VkImageMemoryBarrier imageMemoryBarrier = {};//vks::initializers::imageMemoryBarrier();
+	imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+	imageMemoryBarrier.oldLayout = oldImageLayout;
+	imageMemoryBarrier.newLayout = newImageLayout;
+	imageMemoryBarrier.image = image;
+	imageMemoryBarrier.subresourceRange = subresourceRange;
+
+	// Source layouts (old)
+	// Source access mask controls actions that have to be finished on the old layout
+	// before it will be transitioned to the new layout
+	switch (oldImageLayout)
+	{
+	case VK_IMAGE_LAYOUT_UNDEFINED:
+		// Image layout is undefined (or does not matter)
+		// Only valid as initial layout
+		// No flags required, listed only for completeness
+		imageMemoryBarrier.srcAccessMask = 0;
+		break;
+
+	case VK_IMAGE_LAYOUT_PREINITIALIZED:
+		// Image is preinitialized
+		// Only valid as initial layout for linear images, preserves memory contents
+		// Make sure host writes have been finished
+		imageMemoryBarrier.srcAccessMask = VK_ACCESS_HOST_WRITE_BIT;
+		break;
+
+	case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
+		// Image is a color attachment
+		// Make sure any writes to the color buffer have been finished
+		imageMemoryBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+		break;
+
+	case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
+		// Image is a depth/stencil attachment
+		// Make sure any writes to the depth/stencil buffer have been finished
+		imageMemoryBarrier.srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+		break;
+
+	case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL:
+		// Image is a transfer source 
+		// Make sure any reads from the image have been finished
+		imageMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+		break;
+
+	case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
+		// Image is a transfer destination
+		// Make sure any writes to the image have been finished
+		imageMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+		break;
+
+	case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
+		// Image is read by a shader
+		// Make sure any shader reads from the image have been finished
+		imageMemoryBarrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+		break;
+	default:
+		// Other source layouts aren't handled (yet)
+		break;
 	}
 
-	return true;
+	// Target layouts (new)
+	// Destination access mask controls the dependency for the new image layout
+	switch (newImageLayout)
+	{
+	case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
+		// Image will be used as a transfer destination
+		// Make sure any writes to the image have been finished
+		imageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+		break;
+
+	case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL:
+		// Image will be used as a transfer source
+		// Make sure any reads from the image have been finished
+		imageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+		break;
+
+	case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
+		// Image will be used as a color attachment
+		// Make sure any writes to the color buffer have been finished
+		imageMemoryBarrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+		break;
+
+	case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
+		// Image layout will be used as a depth/stencil attachment
+		// Make sure any writes to depth/stencil buffer have been finished
+		imageMemoryBarrier.dstAccessMask = imageMemoryBarrier.dstAccessMask | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+		break;
+
+	case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
+		// Image will be read in a shader (sampler, input attachment)
+		// Make sure any writes to the image have been finished
+		if (imageMemoryBarrier.srcAccessMask == 0)
+		{
+			imageMemoryBarrier.srcAccessMask = VK_ACCESS_HOST_WRITE_BIT | VK_ACCESS_TRANSFER_WRITE_BIT;
+		}
+		imageMemoryBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+		break;
+	default:
+		// Other source layouts aren't handled (yet)
+		break;
+	}
+
+	// Put barrier inside setup command buffer
+	vkCmdPipelineBarrier(
+		cmdbuffer,
+		srcStageMask,
+		dstStageMask,
+		0,
+		0, nullptr,
+		0, nullptr,
+		1, &imageMemoryBarrier);
 }
