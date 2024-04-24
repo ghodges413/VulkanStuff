@@ -599,244 +599,6 @@ void Application::MainLoop() {
 }
 
 /*
-===================================
-myOrient
-* Create an orientation matrix from pos,
-* fwd and up vectors
-* Only works properly when the default axis is:
-* +x = fwd
-* +y = left
-* +z = up
-===================================
-*/
-void myOrient( Vec3 Pos, Vec3 Fwd, Vec3 Up, float * out ) {
-	//    xaxis = Fwd
-	//    yaxis = Left
-	//    zaxis = Up
-	//
-	//  For DirectX it should be:
-	//    xaxis.x           xaxis.y           xaxis.z   0
-	//    yaxis.x           yaxis.y           yaxis.z   0
-	//    zaxis.x           zaxis.y           zaxis.z   0
-	//    Pos.x             Pos.y             Pos.z     1
-	//  Since DirectX handles its matrices as row major...
-	//  and OpenGL is column major...
-	//  for OpenGL it should be the transverse of this matrix:
-	//    xaxis.x           yaxis.x           zaxis.x   Pos.x
-	//    xaxis.y           yaxis.y           zaxis.y   Pos.y
-	//    xaxis.z           yaxis.z           zaxis.z   Pos.z
-	//    0                 0                 0         1
-
-	Up.Normalize();
-	Fwd.Normalize();
-	Vec3 xaxis = Fwd;
-	Vec3 yaxis = Up.Cross( Fwd ); // get left vector
-	yaxis.Normalize();
-	Vec3 zaxis = Up;
-
-#ifdef DIRECTX
-	out[0] = xaxis.x;
-	out[1] = yaxis.x;
-	out[2] = zaxis.x;
-	out[3] = Pos.x;
-
-	out[4] = xaxis.y;
-	out[5] = yaxis.y;
-	out[6] = zaxis.y;
-	out[7] = Pos.y;
-
-	out[8] = xaxis.z;
-	out[9] = yaxis.z;
-	out[10] = zaxis.z;
-	out[11] = Pos.z;
-
-	out[12] = 0;
-	out[13] = 0;
-	out[14] = 0;
-	out[15] = 1;
-#else // OPENGL
-	out[0] = xaxis.x;
-	out[1] = xaxis.y;
-	out[2] = xaxis.z;
-	out[3] = 0;
-
-	out[4] = yaxis.x;
-	out[5] = yaxis.y;
-	out[6] = yaxis.z;
-	out[7] = 0;
-
-	out[8] = zaxis.x;
-	out[9] = zaxis.y;
-	out[10] = zaxis.z;
-	out[11] = 0;
-
-	out[12] = Pos.x;
-	out[13] = Pos.y;
-	out[14] = Pos.z;
-	out[15] = 1;
-#endif
-}
-
-/*
-===================================
-mygluLookAt
-===================================
-*/
-void mygluLookAt( Vec3 pos, Vec3 lookAt, Vec3 up, float * m ) {
-	Vec3 lookDir = pos - lookAt;
-	lookDir.Normalize();
-
-	Vec3 right = up.Cross( lookDir );
-	right.Normalize();
-
-	up = lookDir.Cross( right );
-	up.Normalize();
-
-	m[ 0 ] = right[ 0 ];
-	m[ 1 ] = up[ 0 ];
-	m[ 2 ] = lookDir[ 0 ];
-	m[ 3 ] = 0;
-
-	m[ 4 ] = right[ 1 ];
-	m[ 5 ] = up[ 1 ];
-	m[ 6 ] = lookDir[ 1 ];
-	m[ 7 ] = 0;
-
-	m[ 8 ] = right[ 2 ];
-	m[ 9 ] = up[ 2 ];
-	m[ 10 ] = lookDir[ 2 ];
-	m[ 11 ] = 0;
-
-	m[ 12 ] = -pos.Dot( right );
-	m[ 13 ] = -pos.Dot( up );
-	m[ 14 ] = -pos.Dot( lookDir );
-	m[ 15 ] = 1;    
-}
-
-
-/*
-====================================
-myglMatrixMultiply
-====================================
-*/
-void myglMatrixMultiply( const float * a, const float * b, float * out ) {
-	out[ 0 ]  = a[ 0 ]*b[ 0 ] + a[ 1 ]*b[ 4 ] + a[ 2 ]*b[ 8 ]  + a[3 ]*b[12];
-	out[ 1 ]  = a[ 0 ]*b[ 1 ] + a[ 1 ]*b[ 5 ] + a[ 2 ]*b[ 9 ]  + a[3 ]*b[13];
-	out[ 2 ]  = a[ 0 ]*b[ 2 ] + a[ 1 ]*b[ 6 ] + a[ 2 ]*b[ 10 ] + a[3 ]*b[14];
-	out[ 3 ]  = a[ 0 ]*b[ 3 ] + a[ 1 ]*b[ 7 ] + a[ 2 ]*b[ 11 ] + a[3 ]*b[15];
-
-	out[ 4 ]  = a[ 4 ]*b[ 0 ] + a[ 5 ]*b[ 4 ] + a[ 6 ]*b[ 8 ]  + a[7 ]*b[12];
-	out[ 5 ]  = a[ 4 ]*b[ 1 ] + a[ 5 ]*b[ 5 ] + a[ 6 ]*b[ 9 ]  + a[7 ]*b[13];
-	out[ 6 ]  = a[ 4 ]*b[ 2 ] + a[ 5 ]*b[ 6 ] + a[ 6 ]*b[ 10 ] + a[7 ]*b[14];
-	out[ 7 ]  = a[ 4 ]*b[ 3 ] + a[ 5 ]*b[ 7 ] + a[ 6 ]*b[ 11 ] + a[7 ]*b[15];
-
-	out[ 8 ]  = a[ 8 ]*b[ 0 ] + a[ 9 ]*b[ 4 ] + a[ 10 ]*b[ 8 ]  + a[11]*b[12];
-	out[ 9 ]  = a[ 8 ]*b[ 1 ] + a[ 9 ]*b[ 5 ] + a[ 10 ]*b[ 9 ]  + a[11]*b[13];
-	out[ 10 ] = a[ 8 ]*b[ 2 ] + a[ 9 ]*b[ 6 ] + a[ 10 ]*b[ 10 ] + a[11]*b[14];
-	out[ 11 ] = a[ 8 ]*b[ 3 ] + a[ 9 ]*b[ 7 ] + a[ 10 ]*b[ 11 ] + a[11]*b[15];
-
-	out[ 12 ] = a[ 12 ]*b[ 0 ] + a[ 13 ]*b[ 4 ] + a[ 14 ]*b[ 8 ]  + a[15]*b[12];
-	out[ 13 ] = a[ 12 ]*b[ 1 ] + a[ 13 ]*b[ 5 ] + a[ 14 ]*b[ 9 ]  + a[15]*b[13];
-	out[ 14 ] = a[ 12 ]*b[ 2 ] + a[ 13 ]*b[ 6 ] + a[ 14 ]*b[ 10 ] + a[15]*b[14];
-	out[ 15 ] = a[ 12 ]*b[ 3 ] + a[ 13 ]*b[ 7 ] + a[ 14 ]*b[ 11 ] + a[15]*b[15];
-}
-
-
-/*
-====================================
-mygluPerspectiveOpenGL
-* This is my version of glut's convenient perspective
-* matrix generation
-====================================
-*/
-void mygluPerspectiveOpenGL( float fovy, float aspect_ratio, float near, float far, float * out ) {
-	// This perspective matrix definition was defined in http://www.opengl.org/sdk/docs/man/xhtml/gluPerspective.xml
-	const float fovy_radians = fovy * 3.14159f / 180.0f;
-	const float f = 1.0f / tanf( fovy_radians * 0.5f );
-	const float xscale = f;
-	const float yscale = f / aspect_ratio;
-
-	out[ 0 ] = xscale;
-	out[ 1 ] = 0;
-	out[ 2 ] = 0;
-	out[ 3 ] = 0;
-
-	out[ 4 ] = 0;
-	out[ 5 ] = yscale;
-	out[ 6 ] = 0;
-	out[ 7 ] = 0;
-
-	out[ 8 ] = 0;
-	out[ 9 ] = 0;
-	out[ 10] = ( far + near ) / ( near - far );
-	out[ 11] = -1;
-
-	out[ 12] = 0;
-	out[ 13] = 0;
-	out[ 14] = ( 2.0f * far * near ) / ( near - far );
-	out[ 15] = 0;
-}
-void mygluPerspectiveVulkan( float fovy, float aspect_ratio, float near, float far, float * out ) {
-	// Vulkan changed its NDC.  It switch from a left handed coordinate system to a right handed one.
-	// +x points to the right, +z points into the screen, +y points down (it used to point in up, in opengl).
-	// It also changed the range from [-1,1] to [0,1] for the z.
-	// Clip space remains [-1,1] for x and y.
-	// Check section 23 of the specification.
-#if 1
-	float matVulkan[ 16 ];
-	matVulkan[ 0 ] = 1;
-	matVulkan[ 1 ] = 0;
-	matVulkan[ 2 ] = 0;
-	matVulkan[ 3 ] = 0;
-
-	matVulkan[ 4 ] = 0;
-	matVulkan[ 5 ] = -1;
-	matVulkan[ 6 ] = 0;
-	matVulkan[ 7 ] = 0;
-
-	matVulkan[ 8 ] = 0;
-	matVulkan[ 9 ] = 0;
-	matVulkan[ 10] = 0.5f;
-	matVulkan[ 11] = 0;
-
-	matVulkan[ 12] = 0;
-	matVulkan[ 13] = 0;
-	matVulkan[ 14] = 0.5f;
-	matVulkan[ 15] = 1;
-
-	float matOpenGL[ 16 ];
-	mygluPerspectiveOpenGL( fovy, aspect_ratio, near, far, matOpenGL );
-
-	myglMatrixMultiply( matOpenGL, matVulkan, out );
-#else
-	const float fovy_radians = fovy * 3.14159f / 180.0f;
-	const float f = 1.0f / tanf( fovy_radians * 0.5f );
-	const float xscale = f;
-	const float yscale = -f / aspect_ratio;
-
-	out[ 0 ] = xscale;
-	out[ 1 ] = 0;
-	out[ 2 ] = 0;
-	out[ 3 ] = 0;
-
-	out[ 4 ] = 0;
-	out[ 5 ] = yscale;
-	out[ 6 ] = 0;
-	out[ 7 ] = 0;
-
-	out[ 8 ] = 0;
-	out[ 9 ] = 0;
-	out[ 10] = ( far + near ) / ( near - far );
-	out[ 11] = -1;
-
-	out[ 12] = 0;
-	out[ 13] = 0;
-	out[ 14] = ( 2.0f * far * near ) / ( near - far );
-	out[ 15] = 0;
-#endif
-}
-
-/*
 ====================================================
 Application::DrawFrame
 ====================================================
@@ -847,8 +609,8 @@ void Application::DrawFrame() {
 	uint32_t uboByteOffset = 0;
 
 	struct camera_t {
-		float matView[ 16 ];
-		float matProj[ 16 ];
+		Mat4 matView;
+		Mat4 matProj;
 	};
 	camera_t camera;
 
@@ -868,8 +630,10 @@ void Application::DrawFrame() {
 		const float zFar    = 1000.0f;
 		const float fovy	= 45;
 		const float aspect	= (float)windowHeight / (float)windowWidth;
-		mygluPerspectiveVulkan( fovy, aspect, zNear, zFar, camera.matProj );
-		mygluLookAt( camPos, camLookAt, camUp, camera.matView );
+		camera.matProj.PerspectiveVulkan( fovy, aspect, zNear, zFar );
+		camera.matProj = camera.matProj.Transpose();	// Vulkan is column major
+		camera.matView.LookAt( camPos, camLookAt, camUp );
+		camera.matView = camera.matView.Transpose();	// Vulkan is column major
 
 		// Update the uniform buffer for the camera matrices
 		memcpy( mappedData, &camera, sizeof( camera ) );
@@ -894,11 +658,13 @@ void Application::DrawFrame() {
 
 			Entity_t & entity = m_entities[ i ];
 			entity.fwd = Vec3( x, y, 0 );
-			float matOrient[ 16 ];
-			myOrient( entity.pos, entity.fwd, entity.up, matOrient );
+
+			Mat4 matOrient;
+			matOrient.Orient( entity.pos, entity.fwd, entity.up );
+			matOrient = matOrient.Transpose();	// Vulkan is column major
 
 			// Update the uniform buffer with the orientation of this entity
-			memcpy( mappedData + uboByteOffset, matOrient, sizeof( matOrient ) );
+			memcpy( mappedData + uboByteOffset, matOrient.ToPtr(), sizeof( matOrient ) );
 
 			// Issue Draw Commands
 			{
