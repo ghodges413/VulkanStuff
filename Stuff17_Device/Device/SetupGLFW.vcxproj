@@ -27,7 +27,7 @@
     <ClCompile Include="code\Graphics\FrameBuffer.cpp" />
     <ClCompile Include="code\Graphics\Image.cpp" />
     <ClCompile Include="code\Graphics\Samplers.cpp" />
-    <ClCompile Include="code\Graphics\shader.cpp" />
+    <ClCompile Include="code\Graphics\Shader.cpp" />
     <ClCompile Include="code\Graphics\SwapChain.cpp" />
     <ClCompile Include="code\Graphics\Targa.cpp" />
     <ClCompile Include="code\Graphics\Texture.cpp" />
@@ -47,7 +47,7 @@
     <ClInclude Include="code\Graphics\FrameBuffer.h" />
     <ClInclude Include="code\Graphics\Image.h" />
     <ClInclude Include="code\Graphics\Samplers.h" />
-    <ClInclude Include="code\Graphics\shader.h" />
+    <ClInclude Include="code\Graphics\Shader.h" />
     <ClInclude Include="code\Graphics\SwapChain.h" />
     <ClInclude Include="code\Graphics\Targa.h" />
     <ClInclude Include="code\Graphics\Texture.h" />

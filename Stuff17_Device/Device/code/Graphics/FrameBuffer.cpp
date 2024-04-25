@@ -1,8 +1,8 @@
 //
 //  FrameBuffer.cpp
 //
-#include "FrameBuffer.h"
-#include "Fileio.h"
+#include "Graphics/FrameBuffer.h"
+#include "Miscellaneous/Fileio.h"
 #include <assert.h>
 #include <stdio.h>
 

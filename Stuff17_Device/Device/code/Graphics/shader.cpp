@@ -1,17 +1,17 @@
 //
 //  shader.cpp
 //
-#include "shader.h"
-#include "Fileio.h"
+#include "Graphics/Shader.h"
+#include "Miscellaneous/Fileio.h"
 #include <assert.h>
 #include <glslang/Public/ShaderLang.h>
 #include <SPIRV/GlslangToSpv.h>
 #include <string.h>
 
-#include "Texture.h"
+#include "Graphics/Texture.h"
 //#include "Models.h"
 
-#include "FrameBuffer.h"
+#include "Graphics/FrameBuffer.h"
 
 ShaderManager * g_shaderManager = NULL;
 
