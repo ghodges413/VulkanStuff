@@ -1,7 +1,6 @@
-/*
- *  Targa.h
- *
- */
+//
+//  Targa.h
+//
 #pragma once
 
 enum targaOrdering_t {

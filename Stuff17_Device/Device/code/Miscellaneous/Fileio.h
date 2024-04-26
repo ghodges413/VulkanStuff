@@ -1,8 +1,6 @@
-/*
- *  Fileio.h
- *
- */
-
+//
+//	Fileio.h
+//
 #pragma once
 
 void RelativePathToFullPath( const char * relativePathName, char * fullPath );

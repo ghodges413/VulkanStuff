@@ -1,5 +1,5 @@
 //
-//  shader.cpp
+//  Shader.cpp
 //
 #include "Graphics/Shader.h"
 #include "Miscellaneous/Fileio.h"

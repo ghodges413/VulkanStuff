@@ -1,12 +1,12 @@
 //
 //  Descriptor.cpp
 //
-#include "Descriptor.h"
-#include "DeviceContext.h"
-#include "Samplers.h"
-#include "Pipeline.h"
-#include "Image.h"
-#include "AccelerationStructure.h"
+#include "Graphics/Descriptor.h"
+#include "Graphics/DeviceContext.h"
+#include "Graphics/Samplers.h"
+#include "Graphics/Pipeline.h"
+#include "Graphics/Image.h"
+#include "Graphics/AccelerationStructure.h"
 #include "Models/ModelStatic.h"
 #include <vector>
 #include <assert.h>

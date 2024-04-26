@@ -1,7 +1,7 @@
 //
 //  Buffer.cpp
 //
-#include "Buffer.h"
+#include "Graphics/Buffer.h"
 #include <assert.h>
 #include <string.h>
 

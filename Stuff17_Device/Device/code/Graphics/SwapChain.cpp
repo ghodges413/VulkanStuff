@@ -1,8 +1,8 @@
 //
 //  SwapChain.cpp
 //
-#include "SwapChain.h"
-#include "DeviceContext.h"
+#include "Graphics/SwapChain.h"
+#include "Graphics/DeviceContext.h"
 #include "Miscellaneous/Fileio.h"
 #include <assert.h>
 

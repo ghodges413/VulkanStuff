@@ -1,11 +1,9 @@
 //
-//  shader.h
+//  Shader.h
 //
 #pragma once
 #include <map>
-#include "DeviceContext.h"
-//#include "Pipeline.h"
-//#include "Descriptor.h"
+#include "Graphics/DeviceContext.h"
 #include <vulkan/vulkan.h>
 
 /*

@@ -1,8 +1,8 @@
 //
 //  DeviceContext.cpp
 //
-#include "DeviceContext.h"
-#include "Fence.h"
+#include "Graphics/DeviceContext.h"
+#include "Graphics/Fence.h"
 #include <assert.h>
 
 DeviceContext * g_device = NULL;

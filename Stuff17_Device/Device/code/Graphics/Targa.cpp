@@ -1,7 +1,6 @@
-/*
- *  Targa.cpp
- *
- */
+//
+//  Targa.cpp
+//
 #include <stdio.h>
 #include "Graphics/Targa.h"
 #include "Miscellaneous/Fileio.h"

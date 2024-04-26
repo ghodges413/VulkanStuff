@@ -3,7 +3,7 @@
 //
 #pragma once
 #include <vulkan/vulkan.h>
-#include "Image.h"
+#include "Graphics/Image.h"
 
 class DeviceContext;
 

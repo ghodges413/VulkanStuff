@@ -3,9 +3,9 @@
 //
 #pragma once
 #include <vulkan/vulkan.h>
-#include "../Math/Matrix.h"
-#include "../Math/Quat.h"
-#include "Buffer.h"
+#include "Math/Matrix.h"
+#include "Math/Quat.h"
+#include "Graphics/Buffer.h"
 
 class DeviceContext;
 class Texture;

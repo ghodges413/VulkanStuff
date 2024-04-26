@@ -2,7 +2,7 @@
 //  Buffer.h
 //
 #pragma once
-#include "DeviceContext.h"
+#include "Graphics/DeviceContext.h"
 
 /*
 ================================================================================================

@@ -1,9 +1,9 @@
 //
 //  Image.cpp
 //
-#include "Image.h"
-#include "Buffer.h"
-#include "Barrier.h"
+#include "Graphics/Image.h"
+#include "Graphics/Buffer.h"
+#include "Graphics/Barrier.h"
 #include <assert.h>
 #include <stdio.h>
 

@@ -1,7 +1,7 @@
 //
 //  Fence.cpp
 //
-#include "Fence.h"
+#include "Graphics/Fence.h"
 #include <assert.h>
 #include <stdio.h>
 

@@ -1,8 +1,8 @@
 //
 //  Barrier.cpp
 //
-#include "Barrier.h"
-#include "Image.h"
+#include "Graphics/Barrier.h"
+#include "Graphics/Image.h"
 #include <assert.h>
 #include <stdio.h>
 

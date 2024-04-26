@@ -1,7 +1,7 @@
 //
 //  ModelStatic.cpp
 //
-#include "ModelStatic.h"
+#include "Models/ModelStatic.h"
 #include "Math/Vector.h"
 #include "Miscellaneous/Fileio.h"
 #include <string.h>

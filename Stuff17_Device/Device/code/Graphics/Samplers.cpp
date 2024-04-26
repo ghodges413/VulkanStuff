@@ -1,7 +1,7 @@
 //
 //  Texture.cpp
 //
-#include "Samplers.h"
+#include "Graphics/Samplers.h"
 #include <assert.h>
 #include <stdio.h>
 

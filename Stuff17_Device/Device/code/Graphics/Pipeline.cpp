@@ -1,11 +1,11 @@
 //
 //  Pipeline.cpp
 //
-#include "Pipeline.h"
-#include "DeviceContext.h"
-#include "shader.h"
-#include "FrameBuffer.h"
-#include "Descriptor.h"
+#include "Graphics/Pipeline.h"
+#include "Graphics/DeviceContext.h"
+#include "Graphics/Shader.h"
+#include "Graphics/FrameBuffer.h"
+#include "Graphics/Descriptor.h"
 #include "Models/ModelStatic.h"
 #include <assert.h>
 

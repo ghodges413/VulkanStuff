@@ -2,8 +2,8 @@
 //	Quat.h
 //
 #pragma once
-#include "Vector.h"
-#include "Matrix.h"
+#include "Math/Vector.h"
+#include "Math/Matrix.h"
 
 /*
  ================================
