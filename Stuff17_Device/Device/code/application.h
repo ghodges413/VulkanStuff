@@ -96,19 +96,11 @@ private:
 	//
 	//	Descriptor Sets
 	//
-	VkDescriptorPool m_vkDescriptorPool;
-	VkDescriptorSetLayout m_vkDescriptorSetLayout;
-	static const int m_numDescriptorSets = 256;
-	VkDescriptorSet m_vkDescriptorSets[ m_numDescriptorSets ];
-
 	Descriptors m_descriptors;
 
 	//
 	//	PipelineState
 	//
-	VkPipelineLayout m_vkPipelineLayout;
-	VkPipeline m_vkPipeline;
-
 	Pipeline m_pipeline;
 	
 
