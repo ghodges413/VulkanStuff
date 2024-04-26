@@ -8,9 +8,6 @@
 #include <SPIRV/GlslangToSpv.h>
 #include <string.h>
 
-#include "Graphics/Texture.h"
-//#include "Models.h"
-
 #include "Graphics/FrameBuffer.h"
 
 ShaderManager * g_shaderManager = NULL;

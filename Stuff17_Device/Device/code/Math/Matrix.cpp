@@ -2,8 +2,8 @@
 //	Matrix.cpp
 //
 #pragma once
-#include "Vector.h"
-#include "Quat.h"
+#include "Math/Vector.h"
+#include "Math/Quat.h"
 
 void Mat4::Orient( const Vec3 & pos, const Quat & quat ) {
 	Vec3 fwd = quat.RotatePoint( Vec3( 1, 0, 0 ) );

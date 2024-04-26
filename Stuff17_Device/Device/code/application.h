@@ -20,8 +20,9 @@
 #include "Math/Vector.h"
 #include "Graphics/DeviceContext.h"
 #include "Graphics/Buffer.h"
-
-class Texture;
+#include "Graphics/Pipeline.h"
+#include "Graphics/Image.h"
+#include "Graphics/Targa.h"
 
 
 /*
@@ -87,8 +88,10 @@ private:
 	//
 	//	Texture loaded from file
 	//
-	static const int m_numTextures = 4;
-	Texture * m_texture[ m_numTextures ];
+	Image m_imageDiffuse;
+	Image m_imageNormals;
+	Image m_imageGloss;
+	Image m_imageSpecular;
 
 	//
 	//	Descriptor Sets
@@ -98,11 +101,16 @@ private:
 	static const int m_numDescriptorSets = 256;
 	VkDescriptorSet m_vkDescriptorSets[ m_numDescriptorSets ];
 
+	Descriptors m_descriptors;
+
 	//
 	//	PipelineState
 	//
 	VkPipelineLayout m_vkPipelineLayout;
 	VkPipeline m_vkPipeline;
+
+	Pipeline m_pipeline;
+	
 
 	std::vector< Entity_t > m_entities;
 

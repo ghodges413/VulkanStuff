@@ -2,7 +2,6 @@
 //  application.cpp
 //
 #include "application.h"
-#include "Graphics/Texture.h"
 #include "Models/ModelManager.h"
 #include "Models/ModelStatic.h"
 #include "Graphics/Samplers.h"
@@ -295,6 +294,42 @@ bool Application::CreatePipeline( int windowWidth, int windowHeight ) {
 		return false;
 	}
 
+
+	{
+		bool result;
+
+		Descriptors::CreateParms_t descriptorParms;
+		memset( &descriptorParms, 0, sizeof( descriptorParms ) );
+		descriptorParms.type = Descriptors::TYPE_GRAPHICS;
+		descriptorParms.numUniformsVertex = 2;
+		descriptorParms.numSamplerImagesFragment = 4;
+		result = m_descriptors.Create( &m_device, descriptorParms );
+		if ( !result ) {
+			printf( "Unable to build descriptors!\n" );
+			assert( 0 );
+			return false;
+		}
+
+		Pipeline::CreateParms_t pipelineParms;
+		memset( &pipelineParms, 0, sizeof( pipelineParms ) );
+		pipelineParms.renderPass = m_device.m_swapChain.m_vkRenderPass;
+		pipelineParms.descriptors = &m_descriptors;
+		pipelineParms.shader = g_shaderManager->GetShader( "GGX" );
+		pipelineParms.width = m_device.m_swapChain.m_windowWidth;
+		pipelineParms.height = m_device.m_swapChain.m_windowHeight;
+		pipelineParms.cullMode = Pipeline::CULL_MODE_BACK;
+		pipelineParms.blendMode = Pipeline::BLEND_MODE_NONE;
+		pipelineParms.fillMode = Pipeline::FILL_MODE_FILL;
+		pipelineParms.depthTest = true;
+		pipelineParms.depthWrite = true;
+		result = m_pipeline.Create( &m_device, pipelineParms );
+		if ( !result ) {
+			printf( "ERROR: Failed to create copy pipeline\n" );
+			assert( 0 );
+			return false;
+		}
+	}
+
 	return true;
 }
 
@@ -373,16 +408,47 @@ bool Application::InitializeVulkan() {
 	m_uniformBuffer.Allocate( &m_device, NULL, sizeof( float ) * 16 * 4 * 1024, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT );
 
 	//
-	//	Texture loaded from file
+	//	Texture Images
 	//
-	m_texture[ 0 ] = new Texture;
-	m_texture[ 1 ] = new Texture;
-	m_texture[ 2 ] = new Texture;
-	m_texture[ 3 ] = new Texture;
-	m_texture[ 0 ]->LoadFromFile( m_device, "../../common/data/images/shaderBall/paintedMetal_Diffuse.tga" );
-	m_texture[ 1 ]->LoadFromFile( m_device, "../../common/data/images/shaderBall/paintedMetal_Normal.tga" );
-	m_texture[ 2 ]->LoadFromFile( m_device, "../../common/data/images/shaderBall/paintedMetal_Glossiness.tga" );
-	m_texture[ 3 ]->LoadFromFile( m_device, "../../common/data/images/shaderBall/paintedMetal_Specular.tga" );
+	{
+		Targa targaDiffuse;
+		targaDiffuse.Load( "../../common/data/images/shaderBall/paintedMetal_Diffuse.tga" );
+		
+		Targa targaNormals;
+		targaNormals.Load( "../../common/data/images/shaderBall/paintedMetal_Normal.tga" );
+
+		Targa targaGloss;
+		targaGloss.Load( "../../common/data/images/shaderBall/paintedMetal_Glossiness.tga" );
+		
+		Targa targaSpecular;
+		targaSpecular.Load( "../../common/data/images/shaderBall/paintedMetal_Specular.tga" );
+
+		Image::CreateParms_t imageParms;
+		imageParms.depth = 1;
+		imageParms.format = VK_FORMAT_R8G8B8A8_UNORM;
+		imageParms.mipLevels = 1;
+		imageParms.usageFlags = VkImageUsageFlagBits::VK_IMAGE_USAGE_SAMPLED_BIT | VkImageUsageFlagBits::VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+
+		imageParms.width = targaDiffuse.GetWidth();
+		imageParms.height = targaDiffuse.GetHeight();
+		m_imageDiffuse.Create( &m_device, imageParms );
+		m_imageDiffuse.UploadData( &m_device, targaDiffuse.DataPtr() );
+
+		imageParms.width = targaNormals.GetWidth();
+		imageParms.height = targaNormals.GetHeight();
+		m_imageNormals.Create( &m_device, imageParms );
+		m_imageNormals.UploadData( &m_device, targaNormals.DataPtr() );
+
+		imageParms.width = targaGloss.GetWidth();
+		imageParms.height = targaGloss.GetHeight();
+		m_imageGloss.Create( &m_device, imageParms );
+		m_imageGloss.UploadData( &m_device, targaGloss.DataPtr() );
+
+		imageParms.width = targaSpecular.GetWidth();
+		imageParms.height = targaSpecular.GetHeight();
+		m_imageSpecular.Create( &m_device, imageParms );
+		m_imageSpecular.UploadData( &m_device, targaSpecular.DataPtr() );
+	}
 
 	//
 	//	Model loaded from file
@@ -437,7 +503,7 @@ bool Application::InitializeVulkan() {
 			uboModelLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
 			VkDescriptorSetLayoutBinding samplerLayoutBinding[ 4 ] = {};
-			for ( int i = 0; i < m_numTextures; i++ ) {
+			for ( int i = 0; i < 4; i++ ) {
 				samplerLayoutBinding[ i ].binding = 2 + i;
 				samplerLayoutBinding[ i ].descriptorCount = 1;
 				samplerLayoutBinding[ i ].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
@@ -522,14 +588,14 @@ void Application::Cleanup() {
 	// Delete models
 	delete g_modelManager;
 
-	// Destroy Texture
-	for ( int i = 0; i < m_numTextures; i++ ) {
-		if ( NULL != m_texture[ i ] ) {
-			m_texture[ i ]->Cleanup( m_device );
-			delete m_texture[ i ];
-			m_texture[ i ] = NULL;
-		}
-	}
+	// Destroy Images
+	m_imageDiffuse.Cleanup( &m_device );
+	m_imageNormals.Cleanup( &m_device );
+	m_imageGloss.Cleanup( &m_device );
+	m_imageSpecular.Cleanup( &m_device );
+
+	m_pipeline.Cleanup( &m_device );
+	m_descriptors.Cleanup( &m_device );
 
 	// Delete Uniform Buffer Memory
 	m_uniformBuffer.Cleanup( &m_device );
@@ -645,6 +711,12 @@ void Application::DrawFrame() {
 
 	const uint32_t imageIndex = m_device.BeginFrame();
 
+	Image * images[ 4 ];
+	images[ 0 ] = &m_imageDiffuse;
+	images[ 1 ] = &m_imageNormals;
+	images[ 2 ] = &m_imageGloss;
+	images[ 3 ] = &m_imageSpecular;
+
 	// Record Draw Commands
 	{
 		m_device.BeginRenderPass();
@@ -666,9 +738,11 @@ void Application::DrawFrame() {
 			// Update the uniform buffer with the orientation of this entity
 			memcpy( mappedData + uboByteOffset, matOrient.ToPtr(), sizeof( matOrient ) );
 
+			VkCommandBuffer cmdBuffer = m_device.m_vkCommandBuffers[ imageIndex ];
+#if 0
 			// Issue Draw Commands
 			{
-				vkCmdBindPipeline( m_device.m_vkCommandBuffers[ imageIndex ], VK_PIPELINE_BIND_POINT_GRAPHICS, m_vkPipeline );
+				vkCmdBindPipeline( cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_vkPipeline );
 
 				// Create the descriptor set for this draw command
 				const int descriptorIdx = numDescriptorSetsUsed;
@@ -684,9 +758,9 @@ void Application::DrawFrame() {
 					bufferInfoModel.range = sizeof( matOrient );
 
 					VkDescriptorImageInfo imageInfo[ 4 ] = {};
-					for ( int i = 0; i < m_numTextures; i++ ) {
+					for ( int i = 0; i < 4; i++ ) {
 						imageInfo[ i ].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-						imageInfo[ i ].imageView = m_texture[ i ]->m_vkTextureImageView;
+						imageInfo[ i ].imageView = images[ i ]->m_vkImageView;
 						imageInfo[ i ].sampler = Samplers::m_samplerStandard;
 					}
 
@@ -708,7 +782,7 @@ void Application::DrawFrame() {
 					descriptorWrites[ 1 ].descriptorCount = 1;
 					descriptorWrites[ 1 ].pBufferInfo = &bufferInfoModel;
 
-					for ( int i = 0; i < m_numTextures; i++ ) {
+					for ( int i = 0; i < 4; i++ ) {
 						descriptorWrites[ 2 + i ].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 						descriptorWrites[ 2 + i ].dstSet = m_vkDescriptorSets[ numDescriptorSetsUsed ];
 						descriptorWrites[ 2 + i ].dstBinding = 2 + i;
@@ -720,23 +794,38 @@ void Application::DrawFrame() {
 
 					vkUpdateDescriptorSets( m_device.m_vkDevice, static_cast< uint32_t >( descriptorWrites.size() ), descriptorWrites.data(), 0, nullptr );
 					++numDescriptorSetsUsed;
-				}
+
+					// Bind the uniforms
+					vkCmdBindDescriptorSets( cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_vkPipelineLayout, 0, 1, &m_vkDescriptorSets[ descriptorIdx ], 0, nullptr );
+				}				
 
 				// Bind the model
 				VkBuffer vertexBuffers[] = { model->m_vertexBuffer.m_vkBuffer };
 				VkDeviceSize offsets[] = { 0 };
-				vkCmdBindVertexBuffers( m_device.m_vkCommandBuffers[ imageIndex ], 0, 1, vertexBuffers, offsets );
-				vkCmdBindIndexBuffer( m_device.m_vkCommandBuffers[ imageIndex ], model->m_indexBuffer.m_vkBuffer, 0, VK_INDEX_TYPE_UINT32 );
-
-				// Bind the uniforms
-				vkCmdBindDescriptorSets( m_device.m_vkCommandBuffers[ imageIndex ], VK_PIPELINE_BIND_POINT_GRAPHICS, m_vkPipelineLayout, 0, 1, &m_vkDescriptorSets[ descriptorIdx ], 0, nullptr );
-
+				vkCmdBindVertexBuffers( cmdBuffer, 0, 1, vertexBuffers, offsets );
+				vkCmdBindIndexBuffer( cmdBuffer, model->m_indexBuffer.m_vkBuffer, 0, VK_INDEX_TYPE_UINT32 );
+				
 				// Issue draw command
-				vkCmdDrawIndexed( m_device.m_vkCommandBuffers[ imageIndex ], static_cast<uint32_t>( model->m_indices.size() ), 1, 0, 0, 0 );
-
-				//uboByteOffset += sizeof( matOrient );
-				uboByteOffset += m_device.GetAlignedUniformByteOffset( sizeof( matOrient ) );
+				vkCmdDrawIndexed( cmdBuffer, static_cast<uint32_t>( model->m_indices.size() ), 1, 0, 0, 0 );
 			}
+#else
+			m_pipeline.BindPipeline( cmdBuffer );
+
+			// Descriptor is how we bind our buffers and images
+			Descriptor descriptor = m_pipeline.GetFreeDescriptor();
+			descriptor.BindBuffer( &m_uniformBuffer, 0, sizeof( camera ), 0 );					// bind the camera matrices
+			descriptor.BindBuffer( &m_uniformBuffer, uboByteOffset, sizeof( matOrient ), 1 );	// bind the model matrices
+			descriptor.BindImage( m_imageDiffuse, Samplers::m_samplerStandard, 2 );
+			descriptor.BindImage( m_imageNormals, Samplers::m_samplerStandard, 3 );
+			descriptor.BindImage( m_imageGloss, Samplers::m_samplerStandard, 4 );
+			descriptor.BindImage( m_imageSpecular, Samplers::m_samplerStandard, 5 );
+			
+			descriptor.BindDescriptor( &m_device, cmdBuffer, &m_pipeline );
+			model->DrawIndexed( cmdBuffer );
+#endif
+
+			//uboByteOffset += sizeof( matOrient );
+			uboByteOffset += m_device.GetAlignedUniformByteOffset( sizeof( matOrient ) );
 		}
 
 		m_device.EndRenderPass();

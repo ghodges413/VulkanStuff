@@ -20,17 +20,19 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="code\application.cpp" />
+    <ClCompile Include="code\Graphics\AccelerationStructure.cpp" />
     <ClCompile Include="code\Graphics\Barrier.cpp" />
     <ClCompile Include="code\Graphics\Buffer.cpp" />
+    <ClCompile Include="code\Graphics\Descriptor.cpp" />
     <ClCompile Include="code\Graphics\DeviceContext.cpp" />
     <ClCompile Include="code\Graphics\Fence.cpp" />
     <ClCompile Include="code\Graphics\FrameBuffer.cpp" />
     <ClCompile Include="code\Graphics\Image.cpp" />
+    <ClCompile Include="code\Graphics\Pipeline.cpp" />
     <ClCompile Include="code\Graphics\Samplers.cpp" />
     <ClCompile Include="code\Graphics\Shader.cpp" />
     <ClCompile Include="code\Graphics\SwapChain.cpp" />
     <ClCompile Include="code\Graphics\Targa.cpp" />
-    <ClCompile Include="code\Graphics\Texture.cpp" />
     <ClCompile Include="code\main.cpp" />
     <ClCompile Include="code\Math\Matrix.cpp" />
     <ClCompile Include="code\Miscellaneous\Fileio.cpp" />
@@ -40,17 +42,19 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="code\application.h" />
+    <ClInclude Include="code\Graphics\AccelerationStructure.h" />
     <ClInclude Include="code\Graphics\Barrier.h" />
     <ClInclude Include="code\Graphics\Buffer.h" />
+    <ClInclude Include="code\Graphics\Descriptor.h" />
     <ClInclude Include="code\Graphics\DeviceContext.h" />
     <ClInclude Include="code\Graphics\Fence.h" />
     <ClInclude Include="code\Graphics\FrameBuffer.h" />
     <ClInclude Include="code\Graphics\Image.h" />
+    <ClInclude Include="code\Graphics\Pipeline.h" />
     <ClInclude Include="code\Graphics\Samplers.h" />
     <ClInclude Include="code\Graphics\Shader.h" />
     <ClInclude Include="code\Graphics\SwapChain.h" />
     <ClInclude Include="code\Graphics\Targa.h" />
-    <ClInclude Include="code\Graphics\Texture.h" />
     <ClInclude Include="code\Math\Matrix.h" />
     <ClInclude Include="code\Math\Quat.h" />
     <ClInclude Include="code\Math\Vector.h" />
