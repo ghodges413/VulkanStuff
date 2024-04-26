@@ -151,6 +151,9 @@ public:
 
 	int GetAlignedUniformByteOffset( const int offset ) const;
 	int GetAlignedStorageByteOffset( const int offset ) const;
+
+private:
+	bool CheckValidationLayerSupport() const;
 };
 
 extern DeviceContext * g_device;

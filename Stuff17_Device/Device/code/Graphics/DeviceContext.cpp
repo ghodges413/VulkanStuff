@@ -252,6 +252,11 @@ const std::vector< const char * > DeviceContext::m_deviceExtensions = {
 	VK_NV_MESH_SHADER_EXTENSION_NAME,
 };
 
+
+// const std::vector< const char * > DeviceContext::m_validationLayers = {
+// 	"VK_LAYER_LUNARG_standard_validation"
+// };
+
 /*
 ====================================================
 VulkanErrorMessage
@@ -262,6 +267,38 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL VulkanErrorMessage( VkDebugReportFlagsEXT 
 	assert( 0 );
 
 	return VK_FALSE;
+}
+
+/*
+====================================================
+DeviceContext::CheckValidationLayerSupport
+====================================================
+*/
+bool DeviceContext::CheckValidationLayerSupport() const {
+	uint32_t layerCount;
+	vkEnumerateInstanceLayerProperties( &layerCount, nullptr );
+
+	std::vector< VkLayerProperties > availableLayers( layerCount );
+	vkEnumerateInstanceLayerProperties( &layerCount, availableLayers.data() );
+
+	for ( int i = 0; i < m_validationLayers.size(); i++ ) {
+		const char * layerName = m_validationLayers[ i ];
+
+		bool layerFound = false;
+
+		for ( const VkLayerProperties & layerProperties : availableLayers ) {
+			if ( 0 == strcmp( layerName, layerProperties.layerName ) ) {
+				layerFound = true;
+				break;
+			}
+		}
+
+		if ( !layerFound ) {
+			return false;
+		}
+	}
+
+	return true;
 }
 
 /*

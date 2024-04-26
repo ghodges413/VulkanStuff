@@ -106,7 +106,6 @@ private:
 
 	std::vector< Entity_t > m_entities;
 
-	bool CheckValidationLayerSupport() const;
 	std::vector< const char * > GetGLFWRequiredExtensions() const;
 
 	void InitializeGLFW();
@@ -118,7 +117,6 @@ private:
 
 	// Window or Instance Related
 	static void OnWindowResized( GLFWwindow * window, int width, int height );
-	static VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback( VkDebugReportFlagsEXT flags, VkDebugReportObjectTypeEXT objType, uint64_t obj, size_t location, int32_t code, const char * layerPrefix, const char * msg, void * userData );
 
 private:
 // 	static const int WINDOW_WIDTH = 1200;
@@ -132,10 +130,6 @@ private:
 #else
 	static const bool m_enableLayers = false;
 #endif
-
-	static const std::vector< const char * > m_ValidationLayers;
-
-	static const std::vector< const char * > m_DeviceExtensions;
 };
 
 extern Application * g_application;

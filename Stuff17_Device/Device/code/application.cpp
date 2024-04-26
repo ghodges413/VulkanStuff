@@ -11,42 +11,6 @@
 
 Application * g_application = NULL;
 
-const std::vector< const char * > Application::m_DeviceExtensions = {
-	VK_KHR_SWAPCHAIN_EXTENSION_NAME
-};
-
-const std::vector< const char * > Application::m_ValidationLayers = {
-	"VK_LAYER_LUNARG_standard_validation"
-};
-
-/*
-====================================================
-CreateDebugReportCallbackEXT
-====================================================
-*/
-VkResult CreateDebugReportCallbackEXT( VkInstance instance, const VkDebugReportCallbackCreateInfoEXT * pCreateInfo, const VkAllocationCallbacks * pAllocator, VkDebugReportCallbackEXT * pCallback ) {
-	PFN_vkCreateDebugReportCallbackEXT functor = (PFN_vkCreateDebugReportCallbackEXT) vkGetInstanceProcAddr( instance, "vkCreateDebugReportCallbackEXT" );
-
-	if ( functor != nullptr ) {
-		return functor( instance, pCreateInfo, pAllocator, pCallback );
-	} else {
-		return VK_ERROR_EXTENSION_NOT_PRESENT;
-	}
-}
-
-/*
-====================================================
-DestroyDebugReportCallbackEXT
-====================================================
-*/
-void DestroyDebugReportCallbackEXT( VkInstance instance, VkDebugReportCallbackEXT callback, const VkAllocationCallbacks * pAllocator ) {
-	PFN_vkDestroyDebugReportCallbackEXT functor = (PFN_vkDestroyDebugReportCallbackEXT) vkGetInstanceProcAddr( instance, "vkDestroyDebugReportCallbackEXT" );
-
-	if ( functor != nullptr ) {
-		functor( instance, callback, pAllocator );
-	}
-}
-
 /*
 ========================================================================================================
 
@@ -104,38 +68,6 @@ void Application::InitializeGLFW() {
 
 	glfwSetWindowUserPointer( m_glfwWindow, this );
 	glfwSetWindowSizeCallback( m_glfwWindow, Application::OnWindowResized );
-}
-
-/*
-====================================================
-Application::CheckValidationLayerSupport
-====================================================
-*/
-bool Application::CheckValidationLayerSupport() const {
-	uint32_t layerCount;
-	vkEnumerateInstanceLayerProperties( &layerCount, nullptr );
-
-	std::vector< VkLayerProperties > availableLayers( layerCount );
-	vkEnumerateInstanceLayerProperties( &layerCount, availableLayers.data() );
-
-	for ( int i = 0; i < m_ValidationLayers.size(); i++ ) {
-		const char * layerName = m_ValidationLayers[ i ];
-
-		bool layerFound = false;
-
-		for ( const VkLayerProperties & layerProperties : availableLayers ) {
-			if ( 0 == strcmp( layerName, layerProperties.layerName ) ) {
-				layerFound = true;
-				break;
-			}
-		}
-
-		if ( !layerFound ) {
-			return false;
-		}
-	}
-
-	return true;
 }
 
 /*
@@ -406,18 +338,6 @@ void Application::ResizeWindow( int windowWidth, int windowHeight ) {
 
 /*
 ====================================================
-Application::DebugCallback
-====================================================
-*/
-VKAPI_ATTR VkBool32 VKAPI_CALL Application::DebugCallback( VkDebugReportFlagsEXT flags, VkDebugReportObjectTypeEXT objType, uint64_t obj, size_t location, int32_t code, const char * layerPrefix, const char * msg, void * userData ) {
-	printf( "Validation layer: %s\n", msg );
-	assert( 0 );
-
-	return VK_FALSE;
-}
-
-/*
-====================================================
 Application::MainLoop
 ====================================================
 */
@@ -474,12 +394,6 @@ void Application::DrawFrame() {
 	}
 
 	const uint32_t imageIndex = m_device.BeginFrame();
-
-	Image * images[ 4 ];
-	images[ 0 ] = &m_imageDiffuse;
-	images[ 1 ] = &m_imageNormals;
-	images[ 2 ] = &m_imageGloss;
-	images[ 3 ] = &m_imageSpecular;
 
 	// Record Draw Commands
 	{
