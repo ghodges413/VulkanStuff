@@ -50,8 +50,12 @@ void main() {
     vec3 tang   = normalize( worldTangent.xyz );
     vec3 binorm = normalize( cross( norm, tang ) );
     
-    vec3 normal = ( 2.0 * texture( texNormal, fragTexCoord ).rgb ) - 1.0;
-    normal      = normalize( normal );
+    //vec3 normal = ( 2.0 * texture( texNormal, fragTexCoord ).rgb ) - 1.0;
+    //normal      = normalize( normal );
+
+    vec3 normal = texture( texNormal, fragTexCoord ).rgb;
+    normal.xy = 2.0 * normal.xy - 1.0;
+    normal = normalize( normal );
 
     vec3 finalNorm  = normal.x * tang + normal.y * binorm + normal.z * norm;
     finalNorm       = normalize( finalNorm );

@@ -182,9 +182,13 @@ void main() {
     vec4 gbuffer1 = texture( texGbuffer1, fragTexCoord );
     vec4 gbuffer2 = texture( texGbuffer2, fragTexCoord );
 
+    if ( 0 == gbuffer2.a ) {
+        discard;
+    }
+
     vec3 worldPos = gbuffer0.xyz;
     vec3 diffuse = gbuffer1.rgb;
-    vec3 normal = gbuffer2.xyz;    
+    vec3 normal = gbuffer2.xyz;
 
     float roughness = gbuffer0.a;
     float specular = gbuffer1.a;
