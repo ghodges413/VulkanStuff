@@ -195,15 +195,6 @@ void main() {
     
     vec3 dirToCamera = normalize( cameraPos - worldPos.xyz );
 
-    // normal needs to be transformed from texture space to world space
-    //normal.x = 2.0 * ( normal.x - 0.5 );
-    //normal.y = 2.0 * ( normal.y - 0.5 );
-    //normal = normalize( normal );
-
-    //vec3 worldBitangent = cross( worldNormal.xyz, worldTangent.xyz );
-    //normal = normal.x * worldTangent.xyz + normal.y * worldBitangent.xyz + normal.z * worldNormal.xyz;
-    //normal = -normal.x * worldTangent.xyz - normal.y * worldBitangent.xyz + normal.z * worldNormal.xyz; // I wonder if we have a bug in our tga loader
-
     vec4 finalColor = vec4( 0, 0, 0, 1 );
 
     for ( int i = 0; i < lightLists[ workGroupID ].mNumLights && i < gMaxLightsPerTile; i++ ) {
@@ -219,8 +210,6 @@ void main() {
         //specular.r = GGX( normal, dirToCamera, dirToLight, roughness, specular );
         //specular.g = GGX( normal, dirToCamera, dirToLight, roughness, specular );
         //specular.b = GGX( normal, dirToCamera, dirToLight, roughness, specular );
-
-        //specular.rgb = vec3( 0 );   // Hack fix for some bad specular (not sure what's happenign, camera pos seems fine, so does normal)
 
         float flux = clamp( dot( normal, dirToLight ), 0.0, 1.0 );
 
@@ -240,8 +229,4 @@ void main() {
     }
     
     outColor = finalColor;
-
-    // TODO: get rid of this and replace with SH and lightProbes
-    vec3 ambient = vec3( 0.1, 0.08, 0.05 );
-    outColor.rgb += ambient * diffuse.rgb;
 }

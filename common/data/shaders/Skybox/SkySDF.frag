@@ -423,7 +423,7 @@ vec3 LightEnergy( vec3 samplePos, float cosTheta, vec3 sunDir ) {
     //float depth = abs( signedDistance - emissiveDepth );
     float depth = abs( length( samplePos ) - SPHERE_RADIUS - 10.0f );
     float temperature = depth * 0.15;
-    vec3 emissiveColor = BlackBodySpectrum( temperature );
+    vec3 emissiveColor = BlackBodySpectrum( temperature ).bgr;
 
     lightEnergy *= emissiveColor;
 
