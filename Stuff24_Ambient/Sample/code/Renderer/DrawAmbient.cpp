@@ -29,6 +29,8 @@ Image g_ambientImageRed;
 Image g_ambientImageGreen;
 Image g_ambientImageBlue;
 
+Bounds g_ambientBounds = Bounds( Vec3( -100, -100, -100 ), Vec3( 100, 100, 100 ) );
+
 /*
 ====================================================
 InitAmbient
@@ -66,6 +68,7 @@ bool InitAmbient( DeviceContext * device, int width, int height ) {
 		numProbesX = header->numX;
 		numProbesY = header->numY;
 		numProbesZ = header->numZ;
+		g_ambientBounds = header->bounds;
 		ylms = (legendrePolynomials_t *)( data + sizeof( ambientHeader_t ) );
 	}
 
@@ -141,6 +144,8 @@ bool InitAmbient( DeviceContext * device, int width, int height ) {
 		pipelineParms.blendMode = Pipeline::BLEND_MODE_ADDITIVE;
 		pipelineParms.depthTest = false;
 		pipelineParms.depthWrite = false;
+		pipelineParms.pushConstantSize = sizeof( Vec4 ) * 2;
+		pipelineParms.pushConstantShaderStages = VkShaderStageFlagBits::VK_SHADER_STAGE_FRAGMENT_BIT;
 		result = g_ambientPipeline.Create( device, pipelineParms );
 		if ( !result ) {
 			printf( "Unable to build pipeline!\n" );
@@ -168,6 +173,8 @@ bool CleanupAmbient( DeviceContext * device ) {
 	return true;
 }
 
+Vec4 g_ambientBounds2[ 2 ];
+
 /*
 ====================================================
 DrawAmbient
@@ -181,17 +188,22 @@ void DrawAmbient( DrawParms_t & parms ) {
 	const int numModels = parms.numModels;
 	VkCommandBuffer cmdBuffer = device->m_vkCommandBuffers[ cmdBufferIndex ];
 
-// 	const int camOffset = 0;
-// 	const int camSize = sizeof( float ) * 16 * 2;
+	g_ambientBounds2[ 0 ].x = g_ambientBounds.mins.x;
+	g_ambientBounds2[ 0 ].y = g_ambientBounds.mins.y;
+	g_ambientBounds2[ 0 ].z = g_ambientBounds.mins.z;
+
+	g_ambientBounds2[ 1 ].x = g_ambientBounds.maxs.x;
+	g_ambientBounds2[ 1 ].y = g_ambientBounds.maxs.y;
+	g_ambientBounds2[ 1 ].z = g_ambientBounds.maxs.z;
 
 	//
 	//	Draw the ambient
 	//
 	{
 		g_ambientPipeline.BindPipeline( cmdBuffer );
+		g_ambientPipeline.BindPushConstant( cmdBuffer, 0, sizeof( Vec4 ) * 2, g_ambientBounds2 );
 	
 		Descriptor descriptor = g_ambientPipeline.GetFreeDescriptor();
-		//descriptor.BindBuffer( uniforms, camOffset, camSize, 0 );
 
 		descriptor.BindImage( g_ambientImageRed, Samplers::m_samplerStandard, 0 );
 		descriptor.BindImage( g_ambientImageGreen, Samplers::m_samplerStandard, 1 );

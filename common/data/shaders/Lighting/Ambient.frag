@@ -2,6 +2,17 @@
 
 /*
 ==========================================
+Uniforms
+==========================================
+*/
+
+layout( push_constant ) uniform bounds {
+    vec4 mins;
+    vec4 maxs;
+} PushConstant;
+
+/*
+==========================================
 Samplers
 ==========================================
 */
@@ -80,18 +91,21 @@ void main() {
     vec3 diffuse = gbuffer1.rgb;
     vec3 normal = gbuffer2.xyz;
 
-    // These mins/maxs are the bounds of the 3d texture holding the nodes... it should be passed in via uniform or push constant
-    vec3 mins = vec3( -35, -23, -1 );
-    vec3 maxs = vec3( 20, 23, 11 );
+    // These mins/maxs are the bounds of the 3d texture holding the nodes
+    vec3 mins = PushConstant.mins.xyz;
+    vec3 maxs = PushConstant.maxs.xyz;
 
+    // Convert the world space position to uvw coords of the 3d textures
     vec3 dims = maxs - mins;
     vec3 samplePos = worldPos - mins;
     vec3 uvw = samplePos / dims;
 
+    // Sample textures
     vec4 red = texture( texAmbientRed, uvw );
     vec4 green = texture( texAmbientGreen, uvw );
     vec4 blue = texture( texAmbientBlue, uvw );
 
+    // Convert to spherical harmonic components
     vec3 ylm00 = vec3( red.x, green.x, blue.x );
     vec3 ylm11 = vec3( red.y, green.y, blue.y );
     vec3 ylm10 = vec3( red.z, green.z, blue.z );
