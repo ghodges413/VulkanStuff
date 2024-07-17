@@ -49,17 +49,18 @@ void main() {
 
     float roughness = gbuffer0.a;
     float specular = gbuffer1.a;
-    //specular = 0.85;  // uncomment and adjust to brute force test the lightprobe
+    //roughness = 0.15;
+    //specular = 0.5;  // uncomment and adjust to brute force test the lightprobe
     
     vec3 dirToCamera = normalize( cameraPos - worldPos.xyz );
 
     // Get the reflection vector for the center of the lobe (which should move towards the normal as the lobe increases in size)
     vec3 ray = dirToCamera * -1.0;
     vec3 ref = reflect( ray, normal );
-    ref = mix( ref, normal, 1.0 - specular );
+    ref = mix( ref, normal, roughness );
     ref = normalize( ref );
 
     // Sample the light/reflection probe by the shininess of the material
-    vec4 probeColor = textureLod( texLightProbe, ref, ( 1.0 - specular ) * 8.0 ) * specular;
+    vec4 probeColor = textureLod( texLightProbe, ref, roughness * 8.0 ) * specular;
     outColor = probeColor;
 }
