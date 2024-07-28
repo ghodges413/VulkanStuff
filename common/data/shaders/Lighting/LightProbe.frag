@@ -49,8 +49,13 @@ void main() {
 
     float roughness = gbuffer0.a;
     float specular = gbuffer1.a;
-    //roughness = 0.15;
-    //specular = 0.5;  // uncomment and adjust to brute force test the lightprobe
+
+#if 0   // enable to test reflectivity
+    if ( normal.z > 0.9 ) {
+        roughness = 0.0015;
+        specular = 0.95;
+    }
+#endif
     
     vec3 dirToCamera = normalize( cameraPos - worldPos.xyz );
 
