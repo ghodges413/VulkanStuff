@@ -1,0 +1,339 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="code\application.cpp" />
+    <ClCompile Include="code\BSP\Brush.cpp" />
+    <ClCompile Include="code\BSP\BSP.cpp" />
+    <ClCompile Include="code\BSP\Map.cpp" />
+    <ClCompile Include="code\Entities\Entity.cpp" />
+    <ClCompile Include="code\Entities\Player.cpp" />
+    <ClCompile Include="code\Entities\Projectile.cpp" />
+    <ClCompile Include="code\Graphics\AccelerationStructure.cpp" />
+    <ClCompile Include="code\Graphics\Barrier.cpp" />
+    <ClCompile Include="code\Graphics\Buffer.cpp" />
+    <ClCompile Include="code\Graphics\Descriptor.cpp" />
+    <ClCompile Include="code\Graphics\DeviceContext.cpp" />
+    <ClCompile Include="code\Graphics\Fence.cpp" />
+    <ClCompile Include="code\Graphics\FrameBuffer.cpp" />
+    <ClCompile Include="code\Graphics\Image.cpp" />
+    <ClCompile Include="code\Graphics\Pipeline.cpp" />
+    <ClCompile Include="code\Graphics\Samplers.cpp" />
+    <ClCompile Include="code\Graphics\Shader.cpp" />
+    <ClCompile Include="code\Graphics\SwapChain.cpp" />
+    <ClCompile Include="code\Graphics\Targa.cpp" />
+    <ClCompile Include="code\JobSystem\JobAllocators.cpp" />
+    <ClCompile Include="code\JobSystem\JobQueues.cpp" />
+    <ClCompile Include="code\JobSystem\JobSystem.cpp" />
+    <ClCompile Include="code\JobSystem\JobThread.cpp" />
+    <ClCompile Include="code\main.cpp" />
+    <ClCompile Include="code\Math\Bounds.cpp" />
+    <ClCompile Include="code\Math\epa.cpp" />
+    <ClCompile Include="code\Math\Fourier.cpp" />
+    <ClCompile Include="code\Math\Frustum.cpp" />
+    <ClCompile Include="code\Math\gjk.cpp" />
+    <ClCompile Include="code\Math\IntersectionTests.cpp" />
+    <ClCompile Include="code\Math\lcp.cpp" />
+    <ClCompile Include="code\Math\Math.cpp" />
+    <ClCompile Include="code\Math\Matrix.cpp" />
+    <ClCompile Include="code\Math\MatrixOps.cpp" />
+    <ClCompile Include="code\Math\MonteCarlo.cpp" />
+    <ClCompile Include="code\Math\Morton.cpp" />
+    <ClCompile Include="code\Math\Plane.cpp" />
+    <ClCompile Include="code\Math\Quat.cpp" />
+    <ClCompile Include="code\Math\Random.cpp" />
+    <ClCompile Include="code\Math\SignedVolumes.cpp" />
+    <ClCompile Include="code\Math\Sphere.cpp" />
+    <ClCompile Include="code\Math\Vector.cpp" />
+    <ClCompile Include="code\Miscellaneous\Fileio.cpp" />
+    <ClCompile Include="code\Miscellaneous\Input.cpp" />
+    <ClCompile Include="code\Miscellaneous\String.cpp" />
+    <ClCompile Include="code\Miscellaneous\Time.cpp" />
+    <ClCompile Include="code\Models\ModelManager.cpp" />
+    <ClCompile Include="code\Models\ModelOBJ.cpp" />
+    <ClCompile Include="code\Models\ModelShape.cpp" />
+    <ClCompile Include="code\Models\ModelStatic.cpp" />
+    <ClCompile Include="code\Physics\Body.cpp" />
+    <ClCompile Include="code\Physics\BroadPhase.cpp" />
+    <ClCompile Include="code\Physics\BVH.cpp" />
+    <ClCompile Include="code\Physics\Cloth.cpp" />
+    <ClCompile Include="code\Physics\Constraints.cpp" />
+    <ClCompile Include="code\Physics\Constraints\ConstraintBase.cpp" />
+    <ClCompile Include="code\Physics\Constraints\ConstraintConstantVelocity.cpp" />
+    <ClCompile Include="code\Physics\Constraints\ConstraintDistance.cpp" />
+    <ClCompile Include="code\Physics\Constraints\ConstraintHinge.cpp" />
+    <ClCompile Include="code\Physics\Constraints\ConstraintManifold.cpp" />
+    <ClCompile Include="code\Physics\Constraints\ConstraintMotor.cpp" />
+    <ClCompile Include="code\Physics\Constraints\ConstraintOrientation.cpp" />
+    <ClCompile Include="code\Physics\Constraints\ConstraintPenetration.cpp" />
+    <ClCompile Include="code\Physics\Contact.cpp" />
+    <ClCompile Include="code\Physics\Intersections.cpp" />
+    <ClCompile Include="code\Physics\Manifold.cpp" />
+    <ClCompile Include="code\Physics\PhysicsWorld.cpp" />
+    <ClCompile Include="code\Physics\Shapes.cpp" />
+    <ClCompile Include="code\Physics\Shapes\ShapeBase.cpp" />
+    <ClCompile Include="code\Physics\Shapes\ShapeBox.cpp" />
+    <ClCompile Include="code\Physics\Shapes\ShapeCapsule.cpp" />
+    <ClCompile Include="code\Physics\Shapes\ShapeConvex.cpp" />
+    <ClCompile Include="code\Physics\Shapes\ShapeSphere.cpp" />
+    <ClCompile Include="code\Renderer\BuildAmbient.cpp" />
+    <ClCompile Include="code\Renderer\BuildLightProbe.cpp" />
+    <ClCompile Include="code\Renderer\BuildLightTiles.cpp" />
+    <ClCompile Include="code\Renderer\Common.cpp" />
+    <ClCompile Include="code\Renderer\DrawAmbient.cpp" />
+    <ClCompile Include="code\Renderer\DrawGBuffer.cpp" />
+    <ClCompile Include="code\Renderer\DrawLightprobe.cpp" />
+    <ClCompile Include="code\Renderer\DrawOffscreen.cpp" />
+    <ClCompile Include="code\Renderer\DrawShadows.cpp" />
+    <ClCompile Include="code\Renderer\DrawSkybox.cpp" />
+    <ClCompile Include="code\Scenes\Scene.cpp" />
+    <ClCompile Include="code\Scenes\SceneGame.cpp" />
+    <ClCompile Include="code\Threading\Atomics.cpp" />
+    <ClCompile Include="code\Threading\Mutex.cpp" />
+    <ClCompile Include="code\Threading\ThreadLocks.cpp" />
+    <ClCompile Include="code\Threading\Threads.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="code\application.h" />
+    <ClInclude Include="code\BSP\Brush.h" />
+    <ClInclude Include="code\BSP\BSP.h" />
+    <ClInclude Include="code\BSP\Map.h" />
+    <ClInclude Include="code\Entities\Entity.h" />
+    <ClInclude Include="code\Entities\Player.h" />
+    <ClInclude Include="code\Entities\Projectile.h" />
+    <ClInclude Include="code\Graphics\AccelerationStructure.h" />
+    <ClInclude Include="code\Graphics\Barrier.h" />
+    <ClInclude Include="code\Graphics\Buffer.h" />
+    <ClInclude Include="code\Graphics\Descriptor.h" />
+    <ClInclude Include="code\Graphics\DeviceContext.h" />
+    <ClInclude Include="code\Graphics\Fence.h" />
+    <ClInclude Include="code\Graphics\FrameBuffer.h" />
+    <ClInclude Include="code\Graphics\Image.h" />
+    <ClInclude Include="code\Graphics\Pipeline.h" />
+    <ClInclude Include="code\Graphics\Samplers.h" />
+    <ClInclude Include="code\Graphics\Shader.h" />
+    <ClInclude Include="code\Graphics\SwapChain.h" />
+    <ClInclude Include="code\Graphics\Targa.h" />
+    <ClInclude Include="code\JobSystem\JobAllocators.h" />
+    <ClInclude Include="code\JobSystem\JobQueues.h" />
+    <ClInclude Include="code\JobSystem\JobSystem.h" />
+    <ClInclude Include="code\JobSystem\JobThread.h" />
+    <ClInclude Include="code\Math\Bounds.h" />
+    <ClInclude Include="code\Math\Complex.h" />
+    <ClInclude Include="code\Math\epa.h" />
+    <ClInclude Include="code\Math\Fourier.h" />
+    <ClInclude Include="code\Math\Frustum.h" />
+    <ClInclude Include="code\Math\gjk.h" />
+    <ClInclude Include="code\Math\IntersectionTests.h" />
+    <ClInclude Include="code\Math\lcp.h" />
+    <ClInclude Include="code\Math\Math.h" />
+    <ClInclude Include="code\Math\Matrix.h" />
+    <ClInclude Include="code\Math\MatrixOps.h" />
+    <ClInclude Include="code\Math\MonteCarlo.h" />
+    <ClInclude Include="code\Math\Morton.h" />
+    <ClInclude Include="code\Math\Plane.h" />
+    <ClInclude Include="code\Math\Quat.h" />
+    <ClInclude Include="code\Math\Random.h" />
+    <ClInclude Include="code\Math\SignedVolumes.h" />
+    <ClInclude Include="code\Math\Sphere.h" />
+    <ClInclude Include="code\Math\Vector.h" />
+    <ClInclude Include="code\Miscellaneous\Array.h" />
+    <ClInclude Include="code\Miscellaneous\Comparison.h" />
+    <ClInclude Include="code\Miscellaneous\Fileio.h" />
+    <ClInclude Include="code\Miscellaneous\Input.h" />
+    <ClInclude Include="code\Miscellaneous\Pair.h" />
+    <ClInclude Include="code\Miscellaneous\String.h" />
+    <ClInclude Include="code\Miscellaneous\Time.h" />
+    <ClInclude Include="code\Miscellaneous\Types.h" />
+    <ClInclude Include="code\Models\ModelManager.h" />
+    <ClInclude Include="code\Models\ModelOBJ.h" />
+    <ClInclude Include="code\Models\ModelShape.h" />
+    <ClInclude Include="code\Models\ModelStatic.h" />
+    <ClInclude Include="code\Physics\Body.h" />
+    <ClInclude Include="code\Physics\BroadPhase.h" />
+    <ClInclude Include="code\Physics\BVH.h" />
+    <ClInclude Include="code\Physics\Cloth.h" />
+    <ClInclude Include="code\Physics\Constraints.h" />
+    <ClInclude Include="code\Physics\Constraints\ConstraintBase.h" />
+    <ClInclude Include="code\Physics\Constraints\ConstraintConstantVelocity.h" />
+    <ClInclude Include="code\Physics\Constraints\ConstraintDistance.h" />
+    <ClInclude Include="code\Physics\Constraints\ConstraintHinge.h" />
+    <ClInclude Include="code\Physics\Constraints\ConstraintManifold.h" />
+    <ClInclude Include="code\Physics\Constraints\ConstraintMotor.h" />
+    <ClInclude Include="code\Physics\Constraints\ConstraintOrientation.h" />
+    <ClInclude Include="code\Physics\Constraints\ConstraintPenetration.h" />
+    <ClInclude Include="code\Physics\Contact.h" />
+    <ClInclude Include="code\Physics\Intersections.h" />
+    <ClInclude Include="code\Physics\Manifold.h" />
+    <ClInclude Include="code\Physics\PhysicsWorld.h" />
+    <ClInclude Include="code\Physics\Shapes.h" />
+    <ClInclude Include="code\Physics\Shapes\ShapeBase.h" />
+    <ClInclude Include="code\Physics\Shapes\ShapeBox.h" />
+    <ClInclude Include="code\Physics\Shapes\ShapeCapsule.h" />
+    <ClInclude Include="code\Physics\Shapes\ShapeConvex.h" />
+    <ClInclude Include="code\Physics\Shapes\ShapeSphere.h" />
+    <ClInclude Include="code\Renderer\BuildAmbient.h" />
+    <ClInclude Include="code\Renderer\BuildLightProbe.h" />
+    <ClInclude Include="code\Renderer\BuildLightTiles.h" />
+    <ClInclude Include="code\Renderer\Common.h" />
+    <ClInclude Include="code\Renderer\DrawAmbient.h" />
+    <ClInclude Include="code\Renderer\DrawGBuffer.h" />
+    <ClInclude Include="code\Renderer\DrawLightprobe.h" />
+    <ClInclude Include="code\Renderer\DrawOffscreen.h" />
+    <ClInclude Include="code\Renderer\DrawShadows.h" />
+    <ClInclude Include="code\Renderer\DrawSkybox.h" />
+    <ClInclude Include="code\Scenes\Scene.h" />
+    <ClInclude Include="code\Scenes\SceneGame.h" />
+    <ClInclude Include="code\Threading\Atomics.h" />
+    <ClInclude Include="code\Threading\Common.h" />
+    <ClInclude Include="code\Threading\Mutex.h" />
+    <ClInclude Include="code\Threading\ThreadLocks.h" />
+    <ClInclude Include="code\Threading\Threads.h" />
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>15.0</VCProjectVersion>
+    <ProjectGuid>{B021DB63-A042-4F79-91E1-EFEB9D3401A2}</ProjectGuid>
+    <Keyword>Win32Proj</Keyword>
+    <RootNamespace>SetupGLFW</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v141</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v141</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v142</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v142</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="Shared">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <LinkIncremental>true</LinkIncremental>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <LinkIncremental>true</LinkIncremental>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <LinkIncremental>false</LinkIncremental>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <LinkIncremental>false</LinkIncremental>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>code;..\..\common\libs\vulkan_1.1.97.0\Include;..\..\common\libs\glfw-3.2.1.bin.WIN64\include;..\..\common\libs\glslang\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <AdditionalLibraryDirectories>..\..\common\libs\vulkan_1.1.97.0\Lib;..\..\common\libs\glfw-3.2.1.bin.WIN64\lib-vc2015;..\..\common\libs\glslang\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>vulkan-1.lib;glfw3.lib;glslangd.lib;HLSLd.lib;OGLCompilerd.lib;OSDependentd.lib;SPIRVd.lib;SPIRV-Toolsd.lib;SPIRV-Tools-linkd.lib;SPIRV-Tools-optd.lib;SPIRV-Tools-reduced.lib;SPIRV-Tools-sharedd.lib;SPVRemapperd.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>code;..\..\common\libs\vulkan_1.1.97.0\Include;..\..\common\libs\glfw-3.2.1.bin.WIN64\include;..\..\common\libs\glslang\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <AdditionalLibraryDirectories>..\..\common\libs\vulkan_1.1.97.0\Lib;..\..\common\libs\glfw-3.2.1.bin.WIN64\lib-vc2015;..\..\common\libs\glslang\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>vulkan-1.lib;glfw3.lib;glslang.lib;HLSL.lib;OGLCompiler.lib;OSDependent.lib;SPIRV.lib;SPIRV-Tools.lib;SPIRV-Tools-link.lib;SPIRV-Tools-opt.lib;SPIRV-Tools-reduce.lib;SPIRV-Tools-shared.lib;SPVRemapper.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>
