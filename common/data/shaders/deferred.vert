@@ -72,8 +72,8 @@ void main() {
 	worldPos	= model.model * vert;
     
 	//  Transform the normal and tangent to view space
-	vec4 norm	= vec4( inNormal.xyz,     0.0 );
-	vec4 tang	= vec4( inTangent.xyz,    0.0 );
+	vec4 norm	= vec4( inNormal.xyz * 2.0 - 1.0,     0.0 );
+	vec4 tang	= vec4( inTangent.xyz * 2.0 - 1.0,    0.0 );
 	worldNormal	= model.model * norm;
 	worldTangent= model.model * tang;
 }
