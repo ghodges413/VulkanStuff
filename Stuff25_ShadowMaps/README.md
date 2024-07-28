@@ -1,5 +1,7 @@
 # Shadow Maps
-![Shadow Maps](screenshot.jpg)
+![Shadow Maps](screenshot3.jpg)
+![Shadow Maps](screenshot4.jpg)
+![Shadow Maps](screenshot5.jpg)
 
 Shadow mapping is probably the most popular way to add shadowed lighting to a renderer.  In the late 90's and early 2000's stencil shadows were also popular, but they have since fallen out of favor.
 
