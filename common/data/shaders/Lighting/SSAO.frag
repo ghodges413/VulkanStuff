@@ -6,6 +6,13 @@ Uniforms
 ==========================================
 */
 
+layout( push_constant ) uniform aoParms {
+    float aoeRadius;
+    int maxSamples;
+    float time;
+    float pad;
+} PushConstant;
+
 layout( binding = 0 ) uniform uboCamera {
     mat4 view;
     mat4 proj;
@@ -120,20 +127,23 @@ void main() {
     OrthoBasis( normal, tang, bitang );
 
     float occlusionFactor = 0;
-    float aoeRadius = 0.5;
+    float aoeRadius = PushConstant.aoeRadius;
 
     // Use a random rotation for sampling to make the artifacting noisy (this is less offensive to the eye)
-    float theta = rand( fragTexCoord ) * 2.0 * 3.1415;// + PushConstant.parms.y;
+    float theta = rand( fragTexCoord ) * 2.0 * 3.1415 + PushConstant.time;
     mat2 rotation;
     rotation[ 0 ][ 0 ] = cos( theta );
     rotation[ 1 ][ 0 ] = sin( theta );
     rotation[ 0 ][ 1 ] = -sin( theta );
     rotation[ 1 ][ 1 ] = cos( theta );
 
-    // Raymarch the reflected ray until it hits something or runs out of max steps
+    // Sample the area around the fragment for occlusion
     float numSamples = 0;
     int maxSamples = MAX_VECTORS;
-    maxSamples = 5;
+    if ( PushConstant.maxSamples < MAX_VECTORS ) {
+        maxSamples = PushConstant.maxSamples;
+    }
+
     for ( int i = 0; i < maxSamples; i++ ) {
         vec3 testVector = testVectors[ i ];
         testVector.xy = rotation * testVector.xy;

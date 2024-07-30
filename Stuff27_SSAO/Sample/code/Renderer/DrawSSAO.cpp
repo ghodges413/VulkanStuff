@@ -19,6 +19,13 @@ Descriptors	g_ssaoDescriptors;
 
 Model g_ssaoFullScreenModel;
 
+struct aoParms_t {
+	float aoeRadius;
+	int maxSamples;
+	float time;
+	float pad;
+};
+
 /*
 ====================================================
 InitSSAO
@@ -56,6 +63,8 @@ bool InitSSAO( DeviceContext * device, int width, int height ) {
 		pipelineParms.blendMode = Pipeline::BLEND_MODE_MULTIPLY;
 		pipelineParms.depthTest = false;
 		pipelineParms.depthWrite = false;
+		pipelineParms.pushConstantSize = sizeof( Vec4 ) * 2;
+		pipelineParms.pushConstantShaderStages = VkShaderStageFlagBits::VK_SHADER_STAGE_FRAGMENT_BIT;
 		result = g_ssaoPipeline.Create( device, pipelineParms );
 		if ( !result ) {
 			printf( "Unable to build pipeline!\n" );
@@ -95,11 +104,18 @@ void DrawSSAO( DrawParms_t & parms ) {
 	const int camOffset = 0;
 	const int camSize = sizeof( float ) * 16 * 2;
 
+	aoParms_t aoParms;
+	aoParms.aoeRadius = 0.5f;
+	aoParms.maxSamples = 5;
+	aoParms.time = parms.time;
+	aoParms.pad = 0;
+
 	//
 	//	Draw the screen space reflections
 	//
 	{
 		g_ssaoPipeline.BindPipeline( cmdBuffer );
+		g_ssaoPipeline.BindPushConstant( cmdBuffer, 0, sizeof( aoParms_t ), &aoParms );
 
 		// Descriptor is how we bind our buffers and images
 		Descriptor descriptor = g_ssaoPipeline.GetFreeDescriptor();
