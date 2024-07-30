@@ -1,5 +1,5 @@
 # Screen Space Ambient Occlusion
-![SSAO Only](screenshot_aonly.jpg)
+![SSAO Only](screenshot_aoonly.jpg)
 ![No SSAO](screenshot_noao.jpg)
 ![Full](screenshot_full.jpg)
 
