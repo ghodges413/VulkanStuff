@@ -90,7 +90,7 @@ void main() {
     float roughness = gbuffer0.a;
     float specular = gbuffer1.a;
 
-#if 1   // Enable for debug rendering (forces the floor to be shiny)
+#if 0   // Enable for debug rendering (forces the floor to be shiny)
     if ( normal.z < 0.95 ) {
         discard;
     }
