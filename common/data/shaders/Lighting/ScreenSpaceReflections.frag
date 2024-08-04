@@ -44,6 +44,59 @@ layout( location = 0 ) out vec4 outColor;
 
 /*
 ==========================================
+GGX
+==========================================
+*/
+
+// Isotropic microfacet distribution function
+float DistributionIsotropic( vec3 n, vec3 m, float alpha ) {
+    float denom = dot( n, m ) * dot( n, m ) * ( alpha * alpha - 1.0 ) + 1.0;
+    float D = alpha * alpha / ( 3.1415926 * denom * denom );
+    return D;
+}
+// Shlick's approximation to the Fresnel equation
+float FresnelShlick( vec3 N, vec3 V, float R0 ) {
+    // R0 = the reflection coefficient
+    // R0 = ( ( n1 - n2 ) / ( n1 + n2 ) )^2, where n1/n2 are indices of refraction
+    float cosTheta = clamp( dot( N, V ), 0.0, 1.0 );
+    float F = R0 + ( 1.0 - R0 ) * pow( 1.0 - cosTheta, 5.0 );
+    return F;
+}
+float GeometricSelfShadowing( vec3 n, vec3 v, float alpha ) {
+    float a2 = alpha * alpha;
+    float nv = clamp( dot( n, v ), 0.0, 1.0 );
+    float denom = nv + sqrt( a2 + ( 1 - a2 ) * nv * nv );
+    float G = 2.0 * nv / denom;
+    return G;
+}
+float GGX( vec3 N, vec3 V, vec3 L, float roughness, float F0 ) {
+	float alpha = roughness * roughness;
+	
+    // Calculate half vector
+	vec3 H = normalize( L + V );
+
+    float dotNL = clamp( dot( N, L ), 0.0, 1.0 );
+	
+	// D - microfacet distribution function
+    float D = DistributionIsotropic( N, H, alpha );
+	
+	// F - Shlick's Approximation for the Fresnel Reflection
+//    float F = FresnelShlick( N, V, F0 );  // These are equivalent
+    float F = FresnelShlick( L, H, F0 );    // These are equivalent
+	
+	// V - Smith approximation of the bidirectional shadowing masking
+	float visibility =
+            GeometricSelfShadowing( N, L, alpha ) *
+            GeometricSelfShadowing( N, V, alpha );
+	
+	float specular = dotNL * D * F * visibility;
+	return max( specular, 0.0 );
+}
+
+
+
+/*
+==========================================
 ExtractPos
 Gets the camera position from the view matrix
 ==========================================
@@ -90,6 +143,18 @@ void main() {
     float roughness = gbuffer0.a;
     float specular = gbuffer1.a;
 
+
+
+    vec3 cameraPos = ExtractPos( camera.view );
+    vec3 rayView = normalize( worldPos - cameraPos );
+    vec3 rayReflected = reflect( rayView, normal );
+
+    vec3 dirToLight = rayReflected;
+    vec3 dirToCamera = -rayView;
+
+    specular = GGX( normal, dirToCamera, dirToLight, roughness, specular );
+    specular = clamp( specular, 0.0, 1.0 );
+
 #if 0   // Enable for debug rendering (forces the floor to be shiny)
     if ( normal.z < 0.95 ) {
         discard;
@@ -98,14 +163,9 @@ void main() {
     roughness = 0;
     specular = 1;
 #endif
-
     if ( 0 == specular ) {
         discard;
     }
-
-    vec3 cameraPos = ExtractPos( camera.view );
-    vec3 rayView = normalize( worldPos - cameraPos );
-    vec3 rayReflected = reflect( rayView, normal );
 
     // If the reflected ray is headed away from the scene, and towards the camera, then skip the trace
     bool skipTrace = false;
@@ -162,6 +222,6 @@ void main() {
     }
 
     outColor.rgb = color * blend * specular;
-    outColor += ( 1.0 - blend ) * textureLod( texLightProbe, rayReflected, roughness * 8.0 ) * specular;    
+    outColor += ( 1.0 - blend ) * textureLod( texLightProbe, rayReflected, roughness * 8.0 ) * specular;
     outColor.a = 1.0;
 }
