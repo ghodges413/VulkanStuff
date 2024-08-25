@@ -235,7 +235,6 @@ public:
 	void UpdateClothVerts( DeviceContext & deviceContext, float * verts, const int width, const int height, const int stride );
 
 	bool LoadOBJ( const char * localFileName );
-	bool LoadOBJ2( const char * localFileName );
 	void CalculateTangents();
 
 	bool MakeVBO( DeviceContext * device );

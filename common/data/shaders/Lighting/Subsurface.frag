@@ -66,9 +66,9 @@ float CalculateInverseRadius( vec3 n1, vec3 dn, vec3 dx ) {
 float CalculateInverseRadius( vec3 dn, vec3 dx ) {
     float invR = ( length( dn ) / length( dx ) ) - 1.0;
     if ( invR < 0 ) {
+        // Treat negative curvature as flat
         invR = 0;
     }
-    //invR = clamp( invR, 0.0, 1.0 );
     return invR;
 }
 #endif
@@ -88,22 +88,14 @@ main
 ==========================================
 */
 void main() {
-#if 1
-    //vec2 st = gl_FragCoord.xy [wrong units, it's in 1920, 1080]
     vec2 st = fragTexCoord;
     vec4 gbuffer0 = texture( texGbuffer0, st );
     //vec4 gbuffer1 = texture( texGbuffer1, st );
     vec4 gbuffer2 = texture( texGbuffer2, st );
 
-    if ( 0 == gbuffer2.a ) {
-//        discard;
-    }
-
     //vec3 worldPos = gbuffer0.xyz;
     //vec3 diffuse = gbuffer1.rgb;
     //vec3 normal = gbuffer2.xyz;
-    //normal = normalize( worldNormal.xyz );
-#endif
 
     vec3 normal = normalize( worldNormal.xyz );
     normal = gbuffer2.xyz;
