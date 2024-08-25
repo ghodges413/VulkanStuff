@@ -176,7 +176,8 @@ main
 */
 void main() {
     ivec2 tiledCoord = ivec2( gl_FragCoord.xy ) / workGroupSize;
-	int workGroupID = tiledCoord.x + tiledCoord.y * uniformParms.parms.screenWidth / workGroupSize;
+    int numGroupsX = ( uniformParms.parms.screenWidth + workGroupSize - 1 ) / workGroupSize;
+	int workGroupID = tiledCoord.x + tiledCoord.y * numGroupsX;
 
     vec4 gbuffer0 = texture( texGbuffer0, fragTexCoord );
     vec4 gbuffer1 = texture( texGbuffer1, fragTexCoord );

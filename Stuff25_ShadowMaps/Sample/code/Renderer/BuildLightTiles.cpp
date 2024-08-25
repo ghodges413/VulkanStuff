@@ -68,7 +68,10 @@ InitLightTiles
 bool InitLightTiles( DeviceContext * device, int width, int height ) {
 	bool result = false;
 
-	g_numLightTiles = width * height / ( g_threadWdith * g_threadWdith );
+	int numGroupsX = ( width + g_threadWdith - 1 ) / g_threadWdith;
+	int numGroupsY = ( height + g_threadWdith - 1 ) / g_threadWdith;
+	g_numLightTiles = numGroupsX * numGroupsY;
+	//g_numLightTiles = width * height / ( g_threadWdith * g_threadWdith );
 	
 	//
 	//	Build Tiled Lights List pipeline
@@ -221,7 +224,10 @@ void BuildLightTiles( DrawParms_t & parms ) {
 		descriptor.BindStorageBuffer( &g_lightTileStorageBuffer, 0, g_lightTileStorageBuffer.m_vkBufferSize, 3 );
 		descriptor.BindDescriptor( device, cmdBuffer, &g_buildLightTilesPipeline );
 
-		g_buildLightTilesPipeline.DispatchCompute( cmdBuffer, width / g_threadWdith, height / g_threadWdith, 1 );
+		int numGroupsX = ( width + g_threadWdith - 1 ) / g_threadWdith;
+		int numGroupsY = ( height + g_threadWdith - 1 ) / g_threadWdith;
+		g_buildLightTilesPipeline.DispatchCompute( cmdBuffer, numGroupsX, numGroupsY, 1 );
+		//g_buildLightTilesPipeline.DispatchCompute( cmdBuffer, width / g_threadWdith, height / g_threadWdith, 1 );
 	}
 	
 	//

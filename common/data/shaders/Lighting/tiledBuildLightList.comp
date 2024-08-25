@@ -107,7 +107,8 @@ void main() {
 	const int threadsPerWorkGroup = WORK_GROUP_SIZE * WORK_GROUP_SIZE;
 	
 	int threadID = int( gl_LocalInvocationID.x + gl_LocalInvocationID.y * WORK_GROUP_SIZE );
-	int tileID = int( gl_WorkGroupID.x + gl_WorkGroupID.y * uniformParms.parms.screenWidth / WORK_GROUP_SIZE );
+	int numGroupsWide = ( uniformParms.parms.screenWidth + WORK_GROUP_SIZE - 1 ) / WORK_GROUP_SIZE;
+	int tileID = int( gl_WorkGroupID.x + gl_WorkGroupID.y * numGroupsWide );
 
 	lightLists[ tileID ].mNumLights = 0;	// Reset the number of lights to zero
 
