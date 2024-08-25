@@ -1,3 +1,7 @@
+# Baked Data
+*.shambient
+*.lightprobe
+
 # Prerequisites
 *.d
 
