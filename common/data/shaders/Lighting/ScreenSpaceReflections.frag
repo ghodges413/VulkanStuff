@@ -203,8 +203,8 @@ void main() {
 
         // If the trace has hit something, but it's penetrated too deep
         // then rewind and make the step size smaller
-        if ( deltaDist > 0 && deltaDist > threshold && i < maxIters - 2 ) {
-            samplePos = prevPos;
+        if ( deltaDist > 0 && deltaDist > threshold ) {//&& i < maxIters - 2 ) {
+            samplePos = prevPos + rayReflected * threshold * 0.1;
             stepSize *= 0.5;
             continue;
         }
