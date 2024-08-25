@@ -191,7 +191,7 @@ void main() {
     vec3 normal = gbuffer2.xyz;
 
     float roughness = gbuffer0.a;
-    float specular = gbuffer1.a;
+    float metalness = gbuffer1.a;
     
     vec3 dirToCamera = normalize( cameraPos - worldPos.xyz );
 
@@ -206,11 +206,7 @@ void main() {
         vec3 rayToLight = lightPos.xyz - worldPos.xyz;
         vec3 dirToLight = normalize( rayToLight );
 
-        specular = GGX( normal, dirToCamera, dirToLight, roughness, specular );
-        //specular.r = GGX( normal, dirToCamera, dirToLight, roughness, specular );
-        //specular.g = GGX( normal, dirToCamera, dirToLight, roughness, specular );
-        //specular.b = GGX( normal, dirToCamera, dirToLight, roughness, specular );
-
+        float specular = GGX( normal, dirToCamera, dirToLight, roughness, metalness );
         float flux = clamp( dot( normal, dirToLight ), 0.0, 1.0 );
 
         vec3 color;
