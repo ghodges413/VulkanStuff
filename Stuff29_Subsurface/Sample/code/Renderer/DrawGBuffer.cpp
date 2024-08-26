@@ -173,10 +173,10 @@ bool InitGBuffer( DeviceContext * device, int width, int height ) {
 		targaRoughness.Load( "../../common/data/images/skull/skull_a_rough.tga" );
 		targaSpecular.Load( "../../common/data/images/skull/skull_a_metal.tga" );
 #else
-		targaDiffuse.Load( "../../common/data/images/mikkt/mikkt_a_color.tga" );
-		targaNormals.Load( "../../common/data/images/mikkt/mikkt_a_normal.tga" );
-		targaRoughness.Load( "../../common/data/images/mikkt/mikkt_a_rough.tga" );
-		targaSpecular.Load( "../../common/data/images/mikkt/mikkt_a_metal.tga" );
+		targaDiffuse.Load( "../../common/data/images/skull_wax/skull_a_wax_color.tga" );
+		targaNormals.Load( "../../common/data/images/skull_wax/skull_a_wax_normal.tga" );
+		targaRoughness.Load( "../../common/data/images/skull_wax/skull_a_wax_rough.tga" );
+		targaSpecular.Load( "../../common/data/images/skull_wax/skull_a_wax_metal.tga" );
 #endif
 		Image::CreateParms_t imageParms;
 		imageParms.depth = 1;

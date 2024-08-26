@@ -56,8 +56,8 @@ void Scattering( Vec3 * data, int count, float radius ) {
 			// Beta is the absorption parameter for different materials
 			// TODO: make this is a parameter and calculate for various materials
 			//Vec3 beta = Vec3( 10.127f, 50.27f, 200.5f );	// This seems to make a pretty good fleshy material
-			Vec3 beta = Vec3( 100.0f, 10.0f, 50.0f );	// A nice Jade material
-			//Vec3 beta = Vec3( 10.0f, 20.0f, 30.0f );	// Wax?
+			Vec3 beta = Vec3( 100.0f, 10.0f, 50.0f ) * 50.0f;	// A nice Jade material
+			//Vec3 beta = Vec3( 10.0f, 20.0f, 30.0f ) * 30.0f;	// Wax?
 			//Vec3 beta = Vec3( 10.0f, 10.0f, 10.0f );	// Marble?
 			Vec3 trans = Transmittance( beta, ds );
 

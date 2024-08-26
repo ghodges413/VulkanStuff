@@ -128,6 +128,7 @@ bool InitLightTiles( DeviceContext * device, int width, int height ) {
 			light.m_color = Vec4( 1, 0, 0, 1 );
 		} else if ( 1 == colorID ) {
 			light.m_color = Vec4( 0, 1, 0, 1 );
+			//light.m_color = Vec4( 1, 1, 1, 1 );
 		} else if ( 2 == colorID ) {
 			light.m_color = Vec4( 0, 0, 1, 1 );
 		}

@@ -118,5 +118,5 @@ void main() {
     vec2 lookup = vec2( angle, r );
 
     vec4 subsurface = texture( texSubsurfaceTable, lookup );
-    outColor = subsurface * 0.105;
+    outColor = subsurface;
 }
