@@ -1,7 +1,7 @@
 # Temporal Anti-Aliasing
-![TAA](screenshot_taa.jpg)
+![TAA](screenshot_taa_on.jpg)
 
-![No TAA](screenshot_none.jpg)
+![No TAA](screenshot_taa_off.jpg)
 
 Aliasing is the result of rendering to a perfect grid of pixels.  Basically, an edge that should be straight ends up appearing as though it is a jagged edge or staircased.  This is sometimes referred to as the screen door effect, as it can appear as though you're looking through a screen door.
 
@@ -23,6 +23,6 @@ One heuristic for rejecting invalid history pixels is to compare the depth of th
 
 Another heuristic, and the one used in this sample, is to use neighborhood clamping.  It's simple and works well for all situations.
 
-Some of examples of ghosting when there's no heuristic.  Here, the skull and the magenta light are moving in opposite directions:
+An example of ghosting when there's no heuristic.  Here, the skull and the magenta light are moving in opposite directions:
 
 ![Ghosting](screenshot_ghosting.jpg)
