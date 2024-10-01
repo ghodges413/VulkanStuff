@@ -53,14 +53,25 @@ void main() {
     float invY = PushConstant.invDims.y;
 
     // This heuristic is to clamp the history color to the neighborhood of the current frame's pixels
-    vec4 colorNeighbors[ 4 ];
+    vec4 colorNeighbors[ 8 ];
     colorNeighbors[ 0 ] = texture( texFrame, st + vec2( invX, 0 ) );
     colorNeighbors[ 1 ] = texture( texFrame, st + vec2( -invX, 0 ) );
     colorNeighbors[ 2 ] = texture( texFrame, st + vec2( 0, invY ) );
     colorNeighbors[ 3 ] = texture( texFrame, st + vec2( 0, -invY ) );
 
-    vec4 colorMin = min( colorNeighbors[ 0 ], min( colorNeighbors[ 1 ], min( colorNeighbors[ 2 ], colorNeighbors[ 3 ] ) ) );
-    vec4 colorMax = max( colorNeighbors[ 0 ], max( colorNeighbors[ 1 ], max( colorNeighbors[ 2 ], colorNeighbors[ 3 ] ) ) );
+    colorNeighbors[ 4 ] = texture( texFrame, st + vec2( invX, invY ) );
+    colorNeighbors[ 5 ] = texture( texFrame, st + vec2( -invX, invY ) );
+    colorNeighbors[ 6 ] = texture( texFrame, st + vec2( -invX, -invY ) );
+    colorNeighbors[ 7 ] = texture( texFrame, st + vec2( invX, -invY ) );
+
+    vec4 colorMin0 = min( colorNeighbors[ 0 ], min( colorNeighbors[ 1 ], min( colorNeighbors[ 2 ], colorNeighbors[ 3 ] ) ) );
+    vec4 colorMax0 = max( colorNeighbors[ 0 ], max( colorNeighbors[ 1 ], max( colorNeighbors[ 2 ], colorNeighbors[ 3 ] ) ) );
+
+    vec4 colorMin1 = min( colorNeighbors[ 4 ], min( colorNeighbors[ 5 ], min( colorNeighbors[ 6 ], colorNeighbors[ 7 ] ) ) );
+    vec4 colorMax1 = max( colorNeighbors[ 4 ], max( colorNeighbors[ 5 ], max( colorNeighbors[ 6 ], colorNeighbors[ 7 ] ) ) );
+
+    vec4 colorMin = min( colorMin0, colorMin1 );
+    vec4 colorMax = max( colorMax0, colorMax1 );
 
     vec2 stHistory = velocity.xy;
     vec4 colorHistory = texture( texHistory, stHistory );
