@@ -1,6 +1,9 @@
 # Temporal Anti-Aliasing
+
+TAA on:
 ![TAA](screenshot_taa_on.jpg)
 
+TAA off:
 ![No TAA](screenshot_taa_off.jpg)
 
 Aliasing is the result of rendering to a perfect grid of pixels.  Basically, an edge that should be straight ends up appearing as though it is a jagged edge or staircased.  This is sometimes referred to as the screen door effect, as it can appear as though you're looking through a screen door.
