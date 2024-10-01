@@ -141,9 +141,7 @@ void main() {
     vec3 normal = gbuffer2.xyz;
 
     float roughness = gbuffer0.a;
-    float specular = gbuffer1.a;
-
-
+    float metalness = gbuffer1.a;
 
     vec3 cameraPos = ExtractPos( camera.view );
     vec3 rayView = normalize( worldPos - cameraPos );
@@ -152,7 +150,7 @@ void main() {
     vec3 dirToLight = rayReflected;
     vec3 dirToCamera = -rayView;
 
-    specular = GGX( normal, dirToCamera, dirToLight, roughness, specular );
+    float specular = GGX( normal, dirToCamera, dirToLight, roughness, metalness );
     specular = clamp( specular, 0.0, 1.0 );
 
 #if 0   // Enable for debug rendering (forces the floor to be shiny)
@@ -222,6 +220,8 @@ void main() {
     }
 
     outColor.rgb = color * blend * specular;
+    roughness *= roughness;
+    roughness *= roughness;
     outColor += ( 1.0 - blend ) * textureLod( texLightProbe, rayReflected, roughness * 8.0 ) * specular;
     outColor.a = 1.0;
 }
