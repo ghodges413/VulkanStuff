@@ -18,6 +18,8 @@ https://advances.realtimerendering.com/s2018/Efficient%20screen%20space%20subsur
 
 https://therealmjp.github.io/posts/sss-intro/
 
+https://therealmjp.github.io/posts/sss-sg/
+
 https://www.iryoku.com/sssss/downloads/Screen-Space-Perceptual-Rendering-of-Human-Skin.pdf
 
 https://developer.nvidia.com/gpugems/gpugems/part-iii-materials/chapter-16-real-time-approximations-subsurface-scattering
