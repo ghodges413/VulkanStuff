@@ -27,7 +27,7 @@ bool InitTransparent( DeviceContext * device, int width, int height ) {
 	bool result;
 
 	//
-	//	subsurface pipeline
+	//	stochastic pipeline
 	//
 	{
 		Descriptors::CreateParms_t descriptorParms;
@@ -47,11 +47,11 @@ bool InitTransparent( DeviceContext * device, int width, int height ) {
 		pipelineParms.shader = g_shaderManager->GetShader( "Transparent/Stochastic" );
 		pipelineParms.width = g_offscreenFrameBuffer.m_parms.width;
 		pipelineParms.height = g_offscreenFrameBuffer.m_parms.height;
-		pipelineParms.cullMode = Pipeline::CULL_MODE_NONE;
-		pipelineParms.blendMode = Pipeline::BLEND_MODE_ADDITIVE;
+		pipelineParms.cullMode = Pipeline::CULL_MODE_BACK;
+		pipelineParms.blendMode = Pipeline::BLEND_MODE_NONE;
 		pipelineParms.depthCompare = Pipeline::DEPTH_COMPARE_LEQUAL;
-		pipelineParms.depthTest = true;
-		pipelineParms.depthWrite = true;
+		pipelineParms.depthTest = false;
+		pipelineParms.depthWrite = false;
 		pipelineParms.pushConstantShaderStages = VkShaderStageFlagBits::VK_SHADER_STAGE_FRAGMENT_BIT;
 		pipelineParms.pushConstantSize = sizeof( Vec4 ) * 2;
 		result = g_transparentPipeline.Create( device, pipelineParms );

@@ -863,9 +863,9 @@ void Application::UpdateUniforms() {
 
 				int color = numTransparent % 3;
 				if ( 0 == color ) {
-					renderModel.transparentColor = Vec4( 1, 0, 0, 0.5f );
+					renderModel.transparentColor = Vec4( 1, 0, 0, 0.75f );
 				} else if ( 1 == color ) {
-					renderModel.transparentColor = Vec4( 0, 1, 0, 0.25f );
+					renderModel.transparentColor = Vec4( 0, 1, 0, 0.75f );
 				} else {
 					renderModel.transparentColor = Vec4( 0, 0, 1, 0.75f );
 				}
@@ -1003,6 +1003,8 @@ void Application::DrawFrame() {
 
 	DrawSubsurface( parms );
 
+	DrawTransparent( parms );
+
 	g_offscreenFrameBuffer.EndRenderPass( &m_device, imageIndex );
 	g_offscreenFrameBuffer.m_imageColor.TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_GENERAL );
 	g_offscreenFrameBuffer.m_imageDepth.TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_STENCIL_ATTACHMENT_OPTIMAL );
@@ -1011,8 +1013,6 @@ void Application::DrawFrame() {
 	// Fill a buffer with the screen space reflections
 	DrawScreenSpaceReflections( parms );
 #endif
-
-	DrawTransparent( parms );
 
 	DrawTemporalAntiAliasing( parms );
 

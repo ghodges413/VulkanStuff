@@ -1,10 +1,6 @@
 # Order Independent Transparency
 
-![OIT](screenshot0.jpg)
-
-![OIT](screenshot1.jpg)
-
-![OIT](screenshot2.jpg)
+![OIT](screenshot.jpg)
 
 Transparency is a tricky thing in rasterization.  Because the order in which the transparent triangles are drawn matters.  You can sort your triangles by depth and using the painter's algorithm, but this doesn't solve the problem of overlapping/intersecting triangles.
 
