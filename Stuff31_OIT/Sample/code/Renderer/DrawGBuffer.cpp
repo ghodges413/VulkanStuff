@@ -72,12 +72,13 @@ bool InitGBuffer( DeviceContext * device, int width, int height ) {
 		pipelineParms.framebuffer = NULL;//&g_gbuffer;
 		pipelineParms.renderPass = g_gbuffer.m_vkRenderPass;
 		pipelineParms.descriptors = &g_depthPrePassGBufferDescriptors;
-		pipelineParms.shader = g_shaderManager->GetShader( "depthPrePass" );
+		pipelineParms.shader = g_shaderManager->GetShader( "depthPrePassGBuffer" );
 		pipelineParms.width = g_gbuffer.m_parms.width;
 		pipelineParms.height = g_gbuffer.m_parms.height;
 		pipelineParms.cullMode = Pipeline::CULL_MODE_BACK;
 		pipelineParms.depthTest = true;
 		pipelineParms.depthWrite = true;
+		pipelineParms.numColorAttachments = 3;
 		result = g_depthPrePassGBufferPipeline.Create( device, pipelineParms );
 		if ( !result ) {
 			printf( "Unable to build pipeline!\n" );
@@ -233,12 +234,15 @@ void CleanupGBuffer( DeviceContext * device ) {
 	g_imageSkullSpecular.Cleanup( device );
 }
 
+static std::vector< Descriptor > g_depthDescriptorList;
+static std::vector< Descriptor > g_descriptorList;
+
 /*
 ====================================================
-DrawGBuffer
+UpdateGBufferDescriptors
 ====================================================
 */
-void DrawGBuffer( DrawParms_t & parms ) {
+void UpdateGBufferDescriptors( DrawParms_t & parms ) {
 	DeviceContext * device = parms.device;
 	int cmdBufferIndex = parms.cmdBufferIndex;
 	Buffer * uniforms = parms.uniforms;
@@ -253,7 +257,9 @@ void DrawGBuffer( DrawParms_t & parms ) {
 	//	Depth pre-pass
 	//
 	{
-		g_depthPrePassGBufferPipeline.BindPipeline( cmdBuffer );
+		g_depthDescriptorList.reserve( numModels );
+		g_depthDescriptorList.clear();
+
 		for ( int i = 0; i < numModels; i++ ) {
 			const RenderModel & renderModel = renderModels[ i ];
 			if ( NULL == renderModel.modelDraw ) {
@@ -268,8 +274,8 @@ void DrawGBuffer( DrawParms_t & parms ) {
 			descriptor.BindBuffer( uniforms, camOffset, camSize, 0 );									// bind the camera matrices
 			descriptor.BindBuffer( uniforms, renderModel.uboByteOffset, renderModel.uboByteSize, 1 );	// bind the model matrices
 			
-			descriptor.BindDescriptor( device, cmdBuffer, &g_depthPrePassGBufferPipeline );
-			renderModel.modelDraw->DrawIndexed( cmdBuffer );
+			descriptor.UpdateDescriptor( device );
+			g_depthDescriptorList.push_back( descriptor );
 		}
 	}
 
@@ -277,7 +283,9 @@ void DrawGBuffer( DrawParms_t & parms ) {
 	//	Fill g-buffer
 	//
 	{
-		g_deferredPipeline.BindPipeline( cmdBuffer );
+		g_descriptorList.reserve( numModels );
+		g_descriptorList.clear();
+
 		for ( int i = 0; i < numModels; i++ ) {
 			const RenderModel & renderModel = renderModels[ i ];
 			if ( NULL == renderModel.modelDraw ) {
@@ -303,8 +311,67 @@ void DrawGBuffer( DrawParms_t & parms ) {
 				descriptor.BindImage( g_imageSkullSpecular, Samplers::m_samplerRepeat, 5 );
 			}
 			
-			descriptor.BindDescriptor( device, cmdBuffer, &g_deferredPipeline );
+			descriptor.UpdateDescriptor( device );
+			g_descriptorList.push_back( descriptor );
+		}
+	}
+}
+
+/*
+====================================================
+DrawGBuffer
+====================================================
+*/
+void DrawGBuffer( DrawParms_t & parms ) {
+	DeviceContext * device = parms.device;
+	int cmdBufferIndex = parms.cmdBufferIndex;
+	Buffer * uniforms = parms.uniforms;
+	const RenderModel * renderModels = parms.renderModels;
+	const int numModels = parms.numModels;
+	VkCommandBuffer cmdBuffer = device->m_vkCommandBuffers[ cmdBufferIndex ];
+
+	const int camOffset = 0;
+	const int camSize = sizeof( float ) * 16 * 2;
+
+	//
+	//	Depth pre-pass
+	//
+	{
+		int idx = 0;
+		g_depthPrePassGBufferPipeline.BindPipeline( cmdBuffer );
+		for ( int i = 0; i < numModels; i++ ) {
+			const RenderModel & renderModel = renderModels[ i ];
+			if ( NULL == renderModel.modelDraw ) {
+				continue;
+			}
+			if ( renderModel.isTransparent ) {
+				continue;
+			}
+
+			g_depthDescriptorList[ idx ].BindDescriptor( cmdBuffer, &g_depthPrePassGBufferPipeline );
 			renderModel.modelDraw->DrawIndexed( cmdBuffer );
+			idx++;
+		}
+	}
+
+	//
+	//	Fill g-buffer
+	//
+	{
+		int idx = 0;
+		g_deferredPipeline.BindPipeline( cmdBuffer );
+		for ( int i = 0; i < numModels; i++ ) {
+			const RenderModel & renderModel = renderModels[ i ];
+			if ( NULL == renderModel.modelDraw ) {
+				continue;
+			}
+			if ( renderModel.isTransparent ) {
+				continue;
+			}
+
+			g_descriptorList[ idx ].BindDescriptor( cmdBuffer, &g_deferredPipeline );
+			renderModel.modelDraw->DrawIndexed( cmdBuffer );
+			idx++;
 		}
 	}
 }

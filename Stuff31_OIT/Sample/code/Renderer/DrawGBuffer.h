@@ -12,5 +12,6 @@ struct RenderModel;
 
 bool InitGBuffer( DeviceContext * device, int width, int height );
 void CleanupGBuffer( DeviceContext * device );
+void UpdateGBufferDescriptors( DrawParms_t & parms );
 void DrawGBuffer( DrawParms_t & parms );
-void DrawPreDepth( DrawParms_t & parms );
+//void DrawPreDepth( DrawParms_t & parms );
