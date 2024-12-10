@@ -62,7 +62,7 @@ bool InitPreDepth( DeviceContext * device, int width, int height ) {
 		pipelineParms.framebuffer = &g_preDepthFrameBuffer;
 		pipelineParms.renderPass = g_preDepthFrameBuffer.m_vkRenderPass;
 		pipelineParms.descriptors = &g_preDepthDescriptors;
-		pipelineParms.shader = g_shaderManager->GetShader( "depthPrePass" );
+		pipelineParms.shader = g_shaderManager->GetShader( "depthOnly" );
 		pipelineParms.width = g_preDepthFrameBuffer.m_parms.width;
 		pipelineParms.height = g_preDepthFrameBuffer.m_parms.height;
 		pipelineParms.cullMode = Pipeline::CULL_MODE_BACK;
@@ -107,6 +107,24 @@ void DrawPreDepth( DrawParms_t & parms ) {
 	const int camOffset = 0;
 	const int camSize = sizeof( float ) * 16 * 2;
 
+	std::vector< Descriptor > descriptorList;
+	descriptorList.reserve( numModels );
+
+	for ( int i = 0; i < numModels; i++ ) {
+		const RenderModel & renderModel = renderModels[ i ];
+		if ( NULL == renderModel.modelDraw ) {
+			continue;
+		}
+
+		// Descriptor is how we bind our buffers and images
+		Descriptor descriptor = g_preDepthPipeline.GetFreeDescriptor();
+		descriptor.BindBuffer( uniforms, camOffset, camSize, 0 );									// bind the camera matrices
+		descriptor.BindBuffer( uniforms, renderModel.uboByteOffset, renderModel.uboByteSize, 1 );	// bind the model matrices
+			
+		descriptor.UpdateDescriptor( device );
+		descriptorList.push_back( descriptor );
+	}
+
 	//g_preDepthFrameBuffer.m_imageColor.TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL );
 	g_preDepthFrameBuffer.m_imageDepth.TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL );
 	g_preDepthFrameBuffer.BeginRenderPass( device, cmdBufferIndex, true, true );
@@ -115,6 +133,7 @@ void DrawPreDepth( DrawParms_t & parms ) {
 	//	Depth pre-pass
 	//
 	{
+		int idx = 0;
 		g_preDepthPipeline.BindPipeline( cmdBuffer );
 		for ( int i = 0; i < numModels; i++ ) {
 			const RenderModel & renderModel = renderModels[ i ];
@@ -122,13 +141,9 @@ void DrawPreDepth( DrawParms_t & parms ) {
 				continue;
 			}
 
-			// Descriptor is how we bind our buffers and images
-			Descriptor descriptor = g_preDepthPipeline.GetFreeDescriptor();
-			descriptor.BindBuffer( uniforms, camOffset, camSize, 0 );									// bind the camera matrices
-			descriptor.BindBuffer( uniforms, renderModel.uboByteOffset, renderModel.uboByteSize, 1 );	// bind the model matrices
-			
-			descriptor.BindDescriptor( device, cmdBuffer, &g_preDepthPipeline );
+			descriptorList[ idx ].BindDescriptor( cmdBuffer, &g_preDepthPipeline );
 			renderModel.modelDraw->DrawIndexed( cmdBuffer );
+			idx++;
 		}
 	}
 
