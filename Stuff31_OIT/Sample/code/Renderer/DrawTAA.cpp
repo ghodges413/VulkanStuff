@@ -15,14 +15,16 @@
 FrameBuffer * g_taaFrameBufferPtr = NULL;
 FrameBuffer * g_taaVelocityBufferPtr = NULL;
 
-FrameBuffer g_taaFrameBuffer[ 2 ];
-FrameBuffer g_taaVelocityBuffer[ 2 ];
+FrameBuffer g_taaFrameBuffer;
+FrameBuffer g_taaVelocityBuffer;
 
-Pipeline	g_taaVelocityPipeline[ 2 ];
-Descriptors	g_taaVelocityDescriptors[ 2 ];
+Image g_taaHistoryBuffer;
 
-Pipeline	g_taaPipeline[ 2 ];
-Descriptors	g_taaDescriptors[ 2 ];
+Pipeline	g_taaVelocityPipeline;
+Descriptors	g_taaVelocityDescriptors;
+
+Pipeline	g_taaPipeline;
+Descriptors	g_taaDescriptors;
 
 Model g_taaFullScreenModel;
 
@@ -37,6 +39,22 @@ bool InitTemporalAntiAliasing( DeviceContext * device, int width, int height ) {
 	FillFullScreenQuad( g_taaFullScreenModel );
 	g_taaFullScreenModel.MakeVBO( device );
 
+	{
+		Image::CreateParms_t parms;
+		parms.width = width;
+		parms.height = height;
+		parms.depth = 1;
+		parms.mipLevels = 1;
+		parms.format = VK_FORMAT_R32G32B32A32_SFLOAT;
+		parms.usageFlags = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+		if ( !g_taaHistoryBuffer.Create( device, parms ) ) {
+			printf( "ERROR: Failed to creat TAA history buffer\n" );
+			assert( 0 );
+			return false;
+		}
+		g_taaHistoryBuffer.TransitionLayout( device );
+	}
+
 	//
 	//	taa framebuffer
 	//
@@ -48,8 +66,8 @@ bool InitTemporalAntiAliasing( DeviceContext * device, int width, int height ) {
 		parms.width = width;
 		parms.height = height;
 
-		for ( int i = 0; i < 2; i++ ) {
-			result = g_taaFrameBuffer[ i ].Create( device, parms );
+		{
+			result = g_taaFrameBuffer.Create( device, parms );
 			if ( !result ) {
 				printf( "Unable to make taa framebuffer\n" );
 				assert( 0 );
@@ -58,8 +76,8 @@ bool InitTemporalAntiAliasing( DeviceContext * device, int width, int height ) {
 		}
 
 		parms.hasDepth = true;
-		for ( int i = 0; i < 2; i++ ) {
-			result = g_taaVelocityBuffer[ i ].Create( device, parms );
+		{
+			result = g_taaVelocityBuffer.Create( device, parms );
 			if ( !result ) {
 				printf( "Unable to make taa framebuffer\n" );
 				assert( 0 );
@@ -71,12 +89,12 @@ bool InitTemporalAntiAliasing( DeviceContext * device, int width, int height ) {
 	//
 	//	taa velocity pipeline
 	//
-	for ( int i = 0; i < 2; i++ ) {
+	{
 		Descriptors::CreateParms_t descriptorParms;
 		memset( &descriptorParms, 0, sizeof( descriptorParms ) );
 		descriptorParms.type = Descriptors::TYPE_GRAPHICS;
 		descriptorParms.numUniformsVertex = 2;
-		result = g_taaVelocityDescriptors[ i ].Create( device, descriptorParms );
+		result = g_taaVelocityDescriptors.Create( device, descriptorParms );
 		if ( !result ) {
 			printf( "Unable to build descriptors!\n" );
 			assert( 0 );
@@ -84,19 +102,19 @@ bool InitTemporalAntiAliasing( DeviceContext * device, int width, int height ) {
 		}
 
 		Pipeline::CreateParms_t pipelineParms;
-		pipelineParms.framebuffer = &g_taaVelocityBuffer[ i ];
-		pipelineParms.descriptors = &g_taaVelocityDescriptors[ i ];
+		pipelineParms.framebuffer = &g_taaVelocityBuffer;
+		pipelineParms.descriptors = &g_taaVelocityDescriptors;
 		pipelineParms.shader = g_shaderManager->GetShader( "AntiAliasing/TemporalVelocity" );
-		pipelineParms.width = g_taaVelocityBuffer[ i ].m_parms.width;
-		pipelineParms.height = g_taaVelocityBuffer[ i ].m_parms.height;
+		pipelineParms.width = g_taaVelocityBuffer.m_parms.width;
+		pipelineParms.height = g_taaVelocityBuffer.m_parms.height;
 		pipelineParms.cullMode = Pipeline::CULL_MODE_NONE;
 		pipelineParms.blendMode = Pipeline::BLEND_MODE_NONE;
 		pipelineParms.depthCompare = Pipeline::DEPTH_COMPARE_LEQUAL;
 		pipelineParms.depthTest = true;
 		pipelineParms.depthWrite = true;
 		pipelineParms.pushConstantSize = sizeof( Mat4 ) * 2;
-		pipelineParms.pushConstantShaderStages = VkShaderStageFlagBits::VK_SHADER_STAGE_FRAGMENT_BIT;
-		result = g_taaVelocityPipeline[ i ].Create( device, pipelineParms );
+		pipelineParms.pushConstantShaderStages = VkShaderStageFlagBits::VK_SHADER_STAGE_VERTEX_BIT;
+		result = g_taaVelocityPipeline.Create( device, pipelineParms );
 		if ( !result ) {
 			printf( "Unable to build pipeline!\n" );
 			assert( 0 );
@@ -107,12 +125,12 @@ bool InitTemporalAntiAliasing( DeviceContext * device, int width, int height ) {
 	//
 	//	taa accumulation pipeline
 	//
-	for ( int i = 0; i < 2; i++ ) {
+	{
 		Descriptors::CreateParms_t descriptorParms;
 		memset( &descriptorParms, 0, sizeof( descriptorParms ) );
 		descriptorParms.type = Descriptors::TYPE_GRAPHICS;
-		descriptorParms.numSamplerImagesFragment = 5;
-		result = g_taaDescriptors[ i ].Create( device, descriptorParms );
+		descriptorParms.numSamplerImagesFragment = 3;
+		result = g_taaDescriptors.Create( device, descriptorParms );
 		if ( !result ) {
 			printf( "Unable to build descriptors!\n" );
 			assert( 0 );
@@ -120,18 +138,18 @@ bool InitTemporalAntiAliasing( DeviceContext * device, int width, int height ) {
 		}
 
 		Pipeline::CreateParms_t pipelineParms;
-		pipelineParms.framebuffer = &g_taaFrameBuffer[ i ];
-		pipelineParms.descriptors = &g_taaDescriptors[ i ];
+		pipelineParms.framebuffer = &g_taaFrameBuffer;
+		pipelineParms.descriptors = &g_taaDescriptors;
 		pipelineParms.shader = g_shaderManager->GetShader( "AntiAliasing/TemporalAccumulation" );
-		pipelineParms.width = g_taaFrameBuffer[ i ].m_parms.width;
-		pipelineParms.height = g_taaFrameBuffer[ i ].m_parms.height;
+		pipelineParms.width = g_taaFrameBuffer.m_parms.width;
+		pipelineParms.height = g_taaFrameBuffer.m_parms.height;
 		pipelineParms.cullMode = Pipeline::CULL_MODE_NONE;
 		pipelineParms.blendMode = Pipeline::BLEND_MODE_NONE;
 		pipelineParms.depthTest = false;
 		pipelineParms.depthWrite = false;
 		pipelineParms.pushConstantSize = sizeof( float ) * 4;
 		pipelineParms.pushConstantShaderStages = VkShaderStageFlagBits::VK_SHADER_STAGE_FRAGMENT_BIT;
-		result = g_taaPipeline[ i ].Create( device, pipelineParms );
+		result = g_taaPipeline.Create( device, pipelineParms );
 		if ( !result ) {
 			printf( "Unable to build pipeline!\n" );
 			assert( 0 );
@@ -148,16 +166,17 @@ CleanupTemporalAntiAliasing
 ====================================================
 */
 void CleanupTemporalAntiAliasing( DeviceContext * device ) {
-	for ( int i = 0; i < 2; i++ ) {
-		g_taaFrameBuffer[ i ].Cleanup( device );
-		g_taaVelocityBuffer[ i ].Cleanup( device );
+	g_taaHistoryBuffer.Cleanup( device );
 
-		g_taaPipeline[ i ].Cleanup( device );
- 		g_taaDescriptors[ i ].Cleanup( device );
+	g_taaFrameBuffer.Cleanup( device );
+	g_taaVelocityBuffer.Cleanup( device );
 
-		g_taaVelocityPipeline[ i ].Cleanup( device );
- 		g_taaVelocityDescriptors[ i ].Cleanup( device );
-	}
+	g_taaPipeline.Cleanup( device );
+ 	g_taaDescriptors.Cleanup( device );
+
+	g_taaVelocityPipeline.Cleanup( device );
+ 	g_taaVelocityDescriptors.Cleanup( device );
+
 	g_taaFullScreenModel.Cleanup();
 }
 
@@ -194,25 +213,17 @@ void DrawTemporalAntiAliasing( DrawParms_t & parms ) {
 	cameras[ 0 ] = cameras[ 0 ].Transpose();
 	cameras[ 1 ] = cameras[ 1 ].Transpose();
 
-	const int idx0 = ( g_frameCounter + 0 ) % 2;
-	const int idx1 = ( g_frameCounter + 1 ) % 2;
-
 	Vec4 invDims;
-	invDims.x = 1.0f / (float)g_taaFrameBuffer[ 0 ].m_parms.width;
-	invDims.y = 1.0f / (float)g_taaFrameBuffer[ 0 ].m_parms.height;
+	invDims.x = 1.0f / (float)g_taaFrameBuffer.m_parms.width;
+	invDims.y = 1.0f / (float)g_taaFrameBuffer.m_parms.height;
 	invDims.z = 0;
 	invDims.w = 0;
 
-
 	//
-	//	Calculate velocity buffer
+	//	Update descriptors for velocity buffer calculation
 	//
-	g_taaVelocityBuffer[ idx0 ].m_imageColor.TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL );
-	g_taaVelocityBuffer[ idx0 ].m_imageDepth.TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL );
-	g_taaVelocityBuffer[ idx0 ].BeginRenderPass( device, cmdBufferIndex, true, true );
-
-	g_taaVelocityPipeline[ idx0 ].BindPipeline( cmdBuffer );
-	g_taaVelocityPipeline[ idx0 ].BindPushConstant( cmdBuffer, 0, sizeof( Mat4 ) * 2, cameras );
+	std::vector< Descriptor > velDescriptorList;
+	velDescriptorList.reserve( numModels );
 	for ( int i = 0; i < numModels; i++ ) {
 		const RenderModel & renderModel = renderModels[ i ];
 		if ( NULL == renderModel.modelDraw ) {
@@ -220,51 +231,85 @@ void DrawTemporalAntiAliasing( DrawParms_t & parms ) {
 		}
 
 		// Descriptor is how we bind our buffers and images
-		Descriptor descriptor = g_taaVelocityPipeline[ idx0 ].GetFreeDescriptor();
+		Descriptor descriptor = g_taaVelocityPipeline.GetFreeDescriptor();
 
 		descriptor.BindBuffer( uniforms, renderModel.uboByteOffset, renderModel.uboByteSize, 0 );		// bind the model matrices
 		descriptor.BindBuffer( uniformsOld, renderModel.uboByteOffset, renderModel.uboByteSize, 1 );	// bind the model matrices
 
-		descriptor.BindDescriptor( device, cmdBuffer, &g_taaVelocityPipeline[ idx0 ] );
-		renderModel.modelDraw->DrawIndexed( cmdBuffer );
+		descriptor.UpdateDescriptor( device );
+		velDescriptorList.push_back( descriptor );
 	}
-	g_taaVelocityBuffer[ idx0 ].EndRenderPass( device, cmdBufferIndex );
-	g_taaVelocityBuffer[ idx0 ].m_imageColor.TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_GENERAL );
-	g_taaVelocityBuffer[ idx0 ].m_imageDepth.TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_STENCIL_ATTACHMENT_OPTIMAL );
+
+	//
+	//	Calculate velocity buffer
+	//
+	g_taaVelocityBuffer.m_imageColor.TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL );
+	g_taaVelocityBuffer.m_imageDepth.TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL );
+	g_taaVelocityBuffer.BeginRenderPass( device, cmdBufferIndex, true, true );
+
+	g_taaVelocityPipeline.BindPipeline( cmdBuffer );
+	g_taaVelocityPipeline.BindPushConstant( cmdBuffer, 0, sizeof( Mat4 ) * 2, cameras );
+
+	int idx = 0;
+	for ( int i = 0; i < numModels; i++ ) {
+		const RenderModel & renderModel = renderModels[ i ];
+		if ( NULL == renderModel.modelDraw ) {
+			continue;
+		}
+
+		velDescriptorList[ idx ].BindDescriptor( cmdBuffer, &g_taaVelocityPipeline );
+		renderModel.modelDraw->DrawIndexed( cmdBuffer );
+		idx++;
+	}
+	g_taaVelocityBuffer.EndRenderPass( device, cmdBufferIndex );
+	g_taaVelocityBuffer.m_imageColor.TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_GENERAL );
+	g_taaVelocityBuffer.m_imageDepth.TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_STENCIL_ATTACHMENT_OPTIMAL );
 
 
 	//
-	//	Accumulate the TAA
+	//	Update descriptor for TAA
 	//
-	g_taaFrameBuffer[ idx0 ].m_imageColor.TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL );
-	g_taaFrameBuffer[ idx0 ].BeginRenderPass( device, cmdBufferIndex, true, true );
+	Descriptor descriptor = g_taaPipeline.GetFreeDescriptor();
 	{
-		g_taaPipeline[ idx0 ].BindPipeline( cmdBuffer );
-		g_taaPipeline[ idx0 ].BindPushConstant( cmdBuffer, 0, sizeof( float ) * 4, invDims.ToPtr() );
-
-		// Descriptor is how we bind our buffers and images
-		Descriptor descriptor = g_taaPipeline[ idx0 ].GetFreeDescriptor();
-
 #if defined( USE_SSR )
 		descriptor.BindImage( g_ssrFrameBuffer.m_imageColor, Samplers::m_samplerStandard, 0 );
 #else
 		descriptor.BindImage( g_offscreenFrameBuffer.m_imageColor, Samplers::m_samplerStandard, 0 );
 #endif
-		descriptor.BindImage( g_taaFrameBuffer[ idx1 ].m_imageColor, Samplers::m_samplerNearest, 1 );	// History Buffer
-		descriptor.BindImage( g_taaVelocityBuffer[ idx0 ].m_imageColor, Samplers::m_samplerStandard, 2 );
-		descriptor.BindImage( g_taaVelocityBuffer[ idx1 ].m_imageDepth, Samplers::m_samplerStandard, 3 ); // History Depth
-		descriptor.BindImage( g_taaVelocityBuffer[ idx0 ].m_imageDepth, Samplers::m_samplerStandard, 4 );
+		descriptor.BindImage( g_taaHistoryBuffer, Samplers::m_samplerNearest, 1 );	// History Buffer
+		descriptor.BindImage( g_taaVelocityBuffer.m_imageColor, Samplers::m_samplerStandard, 2 );
 
-		descriptor.BindDescriptor( device, cmdBuffer, &g_taaPipeline[ idx0 ] );
+		descriptor.UpdateDescriptor( device );
+	}
+
+	//
+	//	Accumulate the TAA
+	//
+	g_taaFrameBuffer.m_imageColor.TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL );
+	g_taaFrameBuffer.BeginRenderPass( device, cmdBufferIndex, true, true );
+	{
+		g_taaPipeline.BindPipeline( cmdBuffer );
+		g_taaPipeline.BindPushConstant( cmdBuffer, 0, sizeof( float ) * 4, invDims.ToPtr() );
+
+		descriptor.BindDescriptor( cmdBuffer, &g_taaPipeline );
 		g_taaFullScreenModel.DrawIndexed( cmdBuffer );
 	}
-	g_taaFrameBuffer[ idx0 ].EndRenderPass( device, cmdBufferIndex );
-	g_taaFrameBuffer[ idx0 ].m_imageColor.TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_GENERAL );
-
+	g_taaFrameBuffer.EndRenderPass( device, cmdBufferIndex );
+	
 	g_cameraOld = camera;
 	g_frameCounter++;
 
-	g_taaFrameBufferPtr = &g_taaFrameBuffer[ idx0 ];
-	g_taaVelocityBufferPtr = &g_taaVelocityBuffer[ idx0 ];
-}
+	g_taaFrameBufferPtr = &g_taaFrameBuffer;
+	g_taaVelocityBufferPtr = &g_taaVelocityBuffer;
 
+	//
+	//	Copy the taa buffer into the history buffer
+	//
+	g_taaFrameBuffer.m_imageColor.TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL );
+	g_taaHistoryBuffer.TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL );
+
+	Image::CopyImage( g_taaHistoryBuffer, g_taaFrameBuffer.m_imageColor, cmdBuffer );
+
+ 	g_taaFrameBuffer.m_imageColor.TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_GENERAL );
+ 	g_taaHistoryBuffer.TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_GENERAL );
+}
