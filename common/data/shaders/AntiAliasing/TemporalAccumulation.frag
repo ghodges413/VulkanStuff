@@ -19,8 +19,8 @@ Samplers
 layout( binding = 0 ) uniform sampler2D texFrame;
 layout( binding = 1 ) uniform sampler2D texHistory;
 layout( binding = 2 ) uniform sampler2D texVelocity;
-layout( binding = 3 ) uniform sampler2D texHistoryDepth;
-layout( binding = 4 ) uniform sampler2D texDepth;
+//layout( binding = 3 ) uniform sampler2D texHistoryDepth;
+//layout( binding = 4 ) uniform sampler2D texDepth;
 
 /*
 ==========================================
@@ -47,7 +47,6 @@ void main() {
     vec2 st = fragTexCoord;
     vec4 velocity = texture( texVelocity, st ) + vec4( st.x, st.y, 0, 0 );
     vec4 colorFrame = texture( texFrame, st );
-    float depth = texture( texDepth, st ).r;
 
     float invX = PushConstant.invDims.x;
     float invY = PushConstant.invDims.y;
@@ -75,7 +74,6 @@ void main() {
 
     vec2 stHistory = velocity.xy;
     vec4 colorHistory = texture( texHistory, stHistory );
-    float depthHistory = texture( texHistoryDepth, stHistory ).r;
 
     colorHistory = clamp( colorHistory, colorMin, colorMax );
     outColor = mix( colorFrame, colorHistory, 0.9 );
@@ -90,6 +88,9 @@ void main() {
     // the history pixel to the neighborhood of the current frame's pixel
     // works better in practice.
 #if 0
+    float depth = texture( texDepth, st ).r;
+    float depthHistory = texture( texHistoryDepth, stHistory ).r;
+
     // If this texel was occluded in the last frame, then the history is invalid
     if ( velocity.z - depthHistory > 0.0001 ) {
         outColor = colorFrame;
