@@ -32,7 +32,7 @@ layout( location = 0 ) in vec4 fragTexCoord;
 layout( location = 1 ) in mat4 shadowView;
 layout( location = 5 ) in mat4 shadowProj;
 layout( location = 9 ) in vec4 lightPos;
-layout( location = 10 ) out vec4 cameraPos;
+layout( location = 10 ) in vec4 cameraPos;
 
 /*
 ==========================================
