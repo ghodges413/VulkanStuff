@@ -66,9 +66,9 @@ void vfs::Link( VkInstance instance ) {
 	vfs::vkCompileDeferredNV							= (PFN_vkCompileDeferredNV)vkGetInstanceProcAddr( instance, "vkCompileDeferredNV" );
 
 	// Mesh Shader Related
-	vfs::vkCmdDrawMeshTasksNV							= (PFN_vkCmdDrawMeshTasksNV)vkGetInstanceProcAddr( instance, "vkCmdDrawMeshTasksNV" );
-	vfs::vkCmdDrawMeshTasksIndirectNV					= (PFN_vkCmdDrawMeshTasksIndirectNV)vkGetInstanceProcAddr( instance, "vkCmdDrawMeshTasksIndirectNV" );
-	vfs::vkCmdDrawMeshTasksIndirectCountNV				= (PFN_vkCmdDrawMeshTasksIndirectCountNV)vkGetInstanceProcAddr( instance, "vkCmdDrawMeshTasksIndirectCountNV" );
+// 	vfs::vkCmdDrawMeshTasksNV							= (PFN_vkCmdDrawMeshTasksNV)vkGetInstanceProcAddr( instance, "vkCmdDrawMeshTasksNV" );
+// 	vfs::vkCmdDrawMeshTasksIndirectNV					= (PFN_vkCmdDrawMeshTasksIndirectNV)vkGetInstanceProcAddr( instance, "vkCmdDrawMeshTasksIndirectNV" );
+// 	vfs::vkCmdDrawMeshTasksIndirectCountNV				= (PFN_vkCmdDrawMeshTasksIndirectCountNV)vkGetInstanceProcAddr( instance, "vkCmdDrawMeshTasksIndirectCountNV" );
 }
 
 /*
@@ -95,32 +95,42 @@ bool PhysicalDeviceProperties::AcquireProperties( VkPhysicalDevice device, VkSur
 
 	// Get Extended Device Properties
 	{
+		void * pNext = NULL;
+
 		memset( &m_vkRayTracingProperties, 0, sizeof( m_vkRayTracingProperties ) );
 		m_vkRayTracingProperties.sType = VkStructureType::VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PROPERTIES_NV;
+		m_vkRayTracingProperties.pNext = pNext;
+		pNext = &m_vkRayTracingProperties;
 
-		memset( &m_vkMeshShaderProperties, 0, sizeof( m_vkMeshShaderProperties ) );
-		m_vkMeshShaderProperties.sType = VkStructureType::VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_PROPERTIES_NV;
-		m_vkMeshShaderProperties.pNext = &m_vkRayTracingProperties;
+// 		memset( &m_vkMeshShaderProperties, 0, sizeof( m_vkMeshShaderProperties ) );
+// 		m_vkMeshShaderProperties.sType = VkStructureType::VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_PROPERTIES_NV;
+// 		m_vkMeshShaderProperties.pNext = pNext;
+// 		pNext = &m_vkMeshShaderProperties;
 
 		memset( &m_vkDeviceProperties2, 0, sizeof( m_vkDeviceProperties2 ) );
 		m_vkDeviceProperties2.sType = VkStructureType::VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
-		m_vkDeviceProperties2.pNext = &m_vkMeshShaderProperties;
+		m_vkDeviceProperties2.pNext = pNext;
 		vfs::vkGetPhysicalDeviceProperties2( m_vkPhysicalDevice, &m_vkDeviceProperties2 );
 	}
 
 	// Get Extended Device Features
 	{
+		void * pNext = NULL;
+
 		memset( &m_vkDescriptorIndexingFeatures, 0, sizeof( m_vkDescriptorIndexingFeatures ) );
 		m_vkDescriptorIndexingFeatures.sType = VkStructureType::VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES_EXT;
 		m_vkDescriptorIndexingFeatures.runtimeDescriptorArray = true;
+		m_vkDescriptorIndexingFeatures.pNext = pNext;
+		pNext = &m_vkDescriptorIndexingFeatures;
 
-		memset( &m_vkMeshShaderFeatures, 0, sizeof( m_vkMeshShaderFeatures ) );
-		m_vkMeshShaderFeatures.sType = VkStructureType::VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_FEATURES_NV;
-		m_vkMeshShaderFeatures.pNext = &m_vkDescriptorIndexingFeatures;
+// 		memset( &m_vkMeshShaderFeatures, 0, sizeof( m_vkMeshShaderFeatures ) );
+// 		m_vkMeshShaderFeatures.sType = VkStructureType::VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_FEATURES_NV;
+// 		m_vkMeshShaderFeatures.pNext = pNext;
+// 		pNext = &m_vkMeshShaderFeatures;
 
 		memset( &m_vkFeatures2, 0, sizeof( m_vkFeatures2 ) );
 		m_vkFeatures2.sType = VkStructureType::VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
-		m_vkFeatures2.pNext = &m_vkMeshShaderFeatures;
+		m_vkFeatures2.pNext = pNext;
 		vfs::vkGetPhysicalDeviceFeatures2( m_vkPhysicalDevice, &m_vkFeatures2 );
 	}
 
@@ -246,6 +256,8 @@ DeviceContext
 const std::vector< const char * > DeviceContext::m_deviceExtensions = {
 	VK_KHR_SWAPCHAIN_EXTENSION_NAME,
  	VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME,
+	VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME, // Useful for dynamic streaming to texture arrays
+//	VK_EXT_BLEND_OPERATION_ADVANCED_EXTENSION_NAME,	// AMD gpus don't support this extension, which is required for multiplicative blending
 // #if defined ( ENABLE_RAYTRACING )
 // 	VK_NV_RAY_TRACING_EXTENSION_NAME,
 // #endif
@@ -263,8 +275,11 @@ VulkanErrorMessage
 ====================================================
 */
 static VKAPI_ATTR VkBool32 VKAPI_CALL VulkanErrorMessage( VkDebugReportFlagsEXT flags, VkDebugReportObjectTypeEXT objType, uint64_t obj, size_t location, int32_t code, const char * layerPrefix, const char * msg, void * userData ) {
-	printf( "ERROR: Vulkan validation layer message: %s\n", msg );
-	assert( 0 );
+	//if ( flags & VK_DEBUG_REPORT_ERROR_BIT_EXT ) 
+	{
+		printf( "ERROR: Vulkan validation layer message: %s\n", msg );
+		assert( 0 );
+	}
 
 	return VK_FALSE;
 }
@@ -447,6 +462,10 @@ const char * VendorStr( unsigned int vendorID ) {
 	return "";
 }
 
+bool IsVendorAMD( unsigned int vendorID ) {
+	return ( 0x1002 == vendorID );
+}
+
 /*
 ====================================================
 DeviceContext::CreatePhysicalDevice
@@ -505,7 +524,12 @@ bool DeviceContext::CreatePhysicalDevice() {
 		);
 		printf( "===========================================\n" );
 
-		if ( 0 != i ) {	// HACK: this is to prevent us from picking our amd gpu
+// 		if ( 0 != i ) {	// HACK: this is to prevent us from picking our amd gpu
+// 			continue;
+// 		}
+
+		// Hack to force us on our amd gpu
+		if ( !IsVendorAMD( deviceProperties.m_vkDeviceProperties.vendorID ) ) {
 			continue;
 		}
 
