@@ -83,6 +83,12 @@ bool Image::Create( DeviceContext * device, const CreateParms_t & parms ) {
 		return false;
 	}
 
+	const uint64_t imageInt = (uint64_t)m_vkImage;
+	if ( imageInt == 0xbec98000000421da ) {
+		static volatile int c = 0;
+		c++;
+	}
+
 	//
 	//	Allocate memory on the GPU and attach it to the image
 	//
@@ -179,7 +185,7 @@ bool Image::Create( DeviceContext * device, const CreateParms_t & parms ) {
 		}
 	}
 
-	printf( "Create Image: 0x%04x\n", (unsigned int)m_vkImage );
+	//printf( "Create Image: 0x%04x\n", (unsigned int)m_vkImage );
 
 	return true;
 }
@@ -571,7 +577,7 @@ void Image::TransitionLayout( DeviceContext * device ) {
 Image::TransitionLayout
 ====================================================
 */
-void Image::TransitionLayout( VkCommandBuffer vkCommandBuffer, VkImageLayout newLayout ) {
+void Image::TransitionLayout( VkCommandBuffer cmdBuffer, VkImageLayout newLayout ) {
 	if ( m_vkImageLayout == newLayout ) {
 		return;
 	}
@@ -595,19 +601,25 @@ void Image::TransitionLayout( VkCommandBuffer vkCommandBuffer, VkImageLayout new
 	barrier.subresourceRange.layerCount = 1;
 	barrier.srcAccessMask = 0;
 	barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+	if ( VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL == newLayout ) {
+		barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+	}
 
 	VkPipelineStageFlags sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-	VkPipelineStageFlags destinationStage = VK_PIPELINE_STAGE_TRANSFER_BIT;				
+	VkPipelineStageFlags destinationStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+	if ( VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL == newLayout ) {
+		destinationStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	}
 
 	vkCmdPipelineBarrier(
-		vkCommandBuffer,
+		cmdBuffer,
 		sourceStage,
 		destinationStage,
 		0,
 		0,
-		nullptr,
+		NULL,
 		0,
-		nullptr,
+		NULL,
 		1,
 		&barrier
 	);
@@ -626,7 +638,126 @@ int Image::CalculateMipLevels( int width, int height ) {
 	return mipLevels;
 }
 
+/*
+====================================================
+Image::CopyImage
+====================================================
+*/
+void Image::CopyImage( Image dstImage, Image srcImage, VkCommandBuffer cmdBuffer ) {
+	int width = dstImage.m_parms.width;
+	int height = dstImage.m_parms.height;
 
+	VkImageCopy region = {};
+	region.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	region.srcSubresource.mipLevel = 0;
+	region.srcSubresource.baseArrayLayer = 0;
+	region.srcSubresource.layerCount = 1;
+
+	region.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	region.dstSubresource.mipLevel = 0;
+	region.dstSubresource.baseArrayLayer = 0;
+	region.dstSubresource.layerCount = 1;
+
+	region.extent.width = width;
+	region.extent.height = height;
+	region.extent.depth = 1;
+
+	region.srcOffset.x = 0;
+	region.srcOffset.y = 0;
+	region.srcOffset.z = 0;
+
+	region.dstOffset.x = 0;
+	region.dstOffset.y = 0;
+	region.dstOffset.z = 0;
+
+	vkCmdCopyImage( cmdBuffer, srcImage.m_vkImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, dstImage.m_vkImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region );
+
+	// Use a barrier to make sure the copy is finished
+    VkImageMemoryBarrier memBarrier = {};
+    memBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    memBarrier.pNext = NULL;
+    memBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    memBarrier.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+    memBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    memBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    memBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    memBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    memBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    memBarrier.subresourceRange.baseMipLevel = 0;
+    memBarrier.subresourceRange.levelCount = 1;
+    memBarrier.subresourceRange.baseArrayLayer = 0;
+    memBarrier.subresourceRange.layerCount = 1;
+    memBarrier.image = dstImage.m_vkImage;
+	vkCmdPipelineBarrier( cmdBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0, NULL, 0, NULL, 1, &memBarrier );
+}
+
+/*
+====================================================
+Image::BlitImage
+This is untested code.  Bliting is used to copy images that are different sizes or formats.
+The src image and dst image can be the same image, if the src rect and dst rect don't overlap.
+In the future, this is likely how we'll generate mips for rasterized images.
+
+https://github.com/googlesamples/vulkan-basic-samples/blob/master/API-Samples/copy_blit_image/copy_blit_image.cpp
+====================================================
+*/
+void Image::BlitImage( Image dstImage, Image srcImage, VkCommandBuffer cmdBuffer ) {
+	int width = dstImage.m_parms.width;
+	int height = dstImage.m_parms.height;
+
+    // Do a 32x32 blit to all of the dst image - should get big squares
+    VkImageBlit region;
+    region.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    region.srcSubresource.mipLevel = 0;
+    region.srcSubresource.baseArrayLayer = 0;
+    region.srcSubresource.layerCount = 1;
+
+    region.srcOffsets[0].x = 0;
+    region.srcOffsets[0].y = 0;
+    region.srcOffsets[0].z = 0;
+
+    region.srcOffsets[1].x = 32;
+    region.srcOffsets[1].y = 32;
+    region.srcOffsets[1].z = 1;
+
+    region.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    region.dstSubresource.mipLevel = 0;
+    region.dstSubresource.baseArrayLayer = 0;
+    region.dstSubresource.layerCount = 1;
+    
+	region.dstOffsets[0].x = 0;
+    region.dstOffsets[0].y = 0;
+    region.dstOffsets[0].z = 0;
+    
+	region.dstOffsets[1].x = width;
+    region.dstOffsets[1].y = height;
+    region.dstOffsets[1].z = 1;
+
+    vkCmdBlitImage(
+		cmdBuffer,
+		srcImage.m_vkImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+		dstImage.m_vkImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+        1, &region, VK_FILTER_LINEAR
+	);
+
+    // Use a barrier to make sure the blit is finished
+    VkImageMemoryBarrier memBarrier = {};
+    memBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    memBarrier.pNext = NULL;
+    memBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    memBarrier.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+    memBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    memBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    memBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    memBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    memBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    memBarrier.subresourceRange.baseMipLevel = 0;
+    memBarrier.subresourceRange.levelCount = 1;
+    memBarrier.subresourceRange.baseArrayLayer = 0;
+    memBarrier.subresourceRange.layerCount = 1;
+    memBarrier.image = dstImage.m_vkImage;
+    vkCmdPipelineBarrier( cmdBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, NULL, 0, NULL, 1, &memBarrier );
+}
 
 
 
@@ -1028,10 +1159,9 @@ bool ImageCubeMap::Create( DeviceContext * device ) {
 
 	device->FlushCommandBuffer(copyCmd, device->m_vkGraphicsQueue, true);
 
-
 	// Create image view
 	VkImageViewCreateInfo view = {};
-	view.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+	view.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
 	view.viewType = VK_IMAGE_VIEW_TYPE_CUBE;
 	view.format = format;
 	view.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
@@ -1061,7 +1191,6 @@ void ImageCubeMap::Cleanup( DeviceContext * device ) {
 	vkDestroyImage( device->m_vkDevice, m_vkImage, nullptr );
 	vkFreeMemory( device->m_vkDevice, m_vkDeviceMemory, nullptr );
 }
-
 
 
 

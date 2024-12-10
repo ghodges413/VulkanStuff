@@ -30,10 +30,13 @@ public:
 
 	void Cleanup( DeviceContext * device );
 	void TransitionLayout( DeviceContext * device );
-	void TransitionLayout( VkCommandBuffer vkCommandBuffer, VkImageLayout newLayout );
+	void TransitionLayout( VkCommandBuffer cmdBuffer, VkImageLayout newLayout );
 
 	static int CalculateMipLevels( int width, int height );
 	int GetByteSize() const;
+
+	static void CopyImage( Image dstImage, Image srcImage, VkCommandBuffer cmdBuffer );
+	static void BlitImage( Image dstImage, Image srcImage, VkCommandBuffer cmdBuffer );
 
 	CreateParms_t	m_parms;
 	VkImage			m_vkImage;
