@@ -26,6 +26,7 @@
 #include "Renderer/DrawLightprobe.h"
 #include "Renderer/BuildAmbient.h"
 #include "Renderer/DrawAmbient.h"
+#include "Renderer/DrawAmbientAO.h"
 #include "Renderer/BuildLightProbe.h"
 #include "Renderer/DrawShadows.h"
 #include "Renderer/DrawSSR.h"
@@ -39,6 +40,8 @@
 Application * g_application = NULL;
 
 extern Player * g_player;
+
+//#define USE_SSAO_MULTIPLY	// Only available on Nvidia GPUS
 
 /*
 ========================================================================================================
@@ -250,54 +253,6 @@ std::vector< const char * > Application::GetGLFWRequiredExtensions() const {
 
 /*
 ====================================================
-Application::CreatePipeline
-====================================================
-*/
-bool Application::CreatePipeline( int windowWidth, int windowHeight ) {
-#if 1
-	Pipeline::CreateParms_t pipelineParms;
-	memset( &pipelineParms, 0, sizeof( pipelineParms ) );
-	pipelineParms.renderPass = m_device.m_swapChain.m_vkRenderPass;
-	pipelineParms.descriptors = &m_descriptors;
-	pipelineParms.shader = g_shaderManager->GetShader( "GGX" );
-	pipelineParms.width = m_device.m_swapChain.m_windowWidth;
-	pipelineParms.height = m_device.m_swapChain.m_windowHeight;
-	pipelineParms.cullMode = Pipeline::CULL_MODE_BACK;
-	pipelineParms.blendMode = Pipeline::BLEND_MODE_NONE;
-	pipelineParms.fillMode = Pipeline::FILL_MODE_FILL;
-	pipelineParms.depthTest = true;
-	pipelineParms.depthWrite = true;
-	bool result = m_pipeline.Create( &m_device, pipelineParms );
-	if ( !result ) {
-		printf( "ERROR: Failed to create copy pipeline\n" );
-		assert( 0 );
-		return false;
-	}
-#else
-	Pipeline::CreateParms_t pipelineParms;
-	memset( &pipelineParms, 0, sizeof( pipelineParms ) );
-	pipelineParms.renderPass = m_device.m_swapChain.m_vkRenderPass;
-	pipelineParms.descriptors = &m_descriptors;
-	pipelineParms.shader = g_shaderManager->GetShader( "checkerboard2" );
-	pipelineParms.width = m_device.m_swapChain.m_windowWidth;
-	pipelineParms.height = m_device.m_swapChain.m_windowHeight;
-	pipelineParms.cullMode = Pipeline::CULL_MODE_BACK;
-	pipelineParms.blendMode = Pipeline::BLEND_MODE_NONE;
-	pipelineParms.fillMode = Pipeline::FILL_MODE_FILL;
-	pipelineParms.depthTest = true;
-	pipelineParms.depthWrite = true;
-	bool result = m_pipeline.Create( &m_device, pipelineParms );
-	if ( !result ) {
-		printf( "ERROR: Failed to create copy pipeline\n" );
-		assert( 0 );
-		return false;
-	}
-#endif
-	return true;
-}
-
-/*
-====================================================
 Application::InitializeVulkan
 ====================================================
 */
@@ -372,72 +327,8 @@ bool Application::InitializeVulkan() {
 	m_uniformBuffer[ 1 ].Allocate( &m_device, NULL, sizeof( float ) * 16 * 4 * 4096, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT );
 
 	//
-	//	Texture Images
+	//	Render passes
 	//
-	{
-		Targa targaDiffuse;
-		Targa targaNormals;
-		Targa targaGloss;
-		Targa targaSpecular;
-
-		targaDiffuse.Load( "../../common/data/images/block_1x1/block_a_color.tga" );
-		targaNormals.Load( "../../common/data/images/block_1x1/block_a_normal.tga" );
-		targaGloss.Load( "../../common/data/images/block_1x1/block_a_rough.tga" );
-		targaSpecular.Load( "../../common/data/images/block_1x1/block_a_metal.tga" );
-
-		Image::CreateParms_t imageParms;
-		imageParms.depth = 1;
-		imageParms.format = VK_FORMAT_R8G8B8A8_UNORM;
-		imageParms.mipLevels = 1;
-		imageParms.usageFlags = VkImageUsageFlagBits::VK_IMAGE_USAGE_SAMPLED_BIT | VkImageUsageFlagBits::VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-
-		imageParms.width = targaDiffuse.GetWidth();
-		imageParms.height = targaDiffuse.GetHeight();
-		m_imageDiffuse.Create( &m_device, imageParms );
-		m_imageDiffuse.UploadData( &m_device, targaDiffuse.DataPtr() );
-
-		imageParms.width = targaNormals.GetWidth();
-		imageParms.height = targaNormals.GetHeight();
-		m_imageNormals.Create( &m_device, imageParms );
-		m_imageNormals.UploadData( &m_device, targaNormals.DataPtr() );
-
-		imageParms.width = targaGloss.GetWidth();
-		imageParms.height = targaGloss.GetHeight();
-		m_imageGloss.Create( &m_device, imageParms );
-		m_imageGloss.UploadData( &m_device, targaGloss.DataPtr() );
-
-		imageParms.width = targaSpecular.GetWidth();
-		imageParms.height = targaSpecular.GetHeight();
-		m_imageSpecular.Create( &m_device, imageParms );
-		m_imageSpecular.UploadData( &m_device, targaSpecular.DataPtr() );
-	}
-
-	//
-	//	Descriptor Sets
-	//
-	{
-		Descriptors::CreateParms_t descriptorParms;
-		memset( &descriptorParms, 0, sizeof( descriptorParms ) );
-		descriptorParms.type = Descriptors::TYPE_GRAPHICS;
-		descriptorParms.numUniformsVertex = 2;
-		descriptorParms.numSamplerImagesFragment = 4;
-		bool result = m_descriptors.Create( &m_device, descriptorParms );
-		if ( !result ) {
-			printf( "Unable to build descriptors!\n" );
-			assert( 0 );
-			return false;
-		}
-	}
-
-	//
-	//	Pipeline State
-	//
-	if ( !CreatePipeline( windowWidth, windowHeight ) ) {
-		printf( "Failed to create pipeline!\n" );
-		assert( 0 );
-		return false;
-	}
-
 	InitOffscreen( &m_device, windowWidth, windowHeight );
 	InitDepthPrePass( &m_device );	
 	InitGBuffer( &m_device, windowWidth, windowHeight );
@@ -445,11 +336,17 @@ bool Application::InitializeVulkan() {
 	InitDebugDrawLightTiles( &m_device, windowWidth, windowHeight );
 	InitDrawTiledGGX( &m_device, windowWidth, windowHeight );
 	InitSkybox( &m_device, windowWidth, windowHeight );
+#if !defined( GEN_LIGHTPROBE )
 	InitLightProbe( &m_device, windowWidth, windowHeight );
+#endif
+#if defined( USE_SSAO_MULTIPLY )
 	InitAmbient( &m_device, windowWidth, windowHeight );
+	InitSSAO( &m_device, windowWidth, windowHeight );
+#else
+	InitAmbientAO( &m_device, windowWidth, windowHeight );
+#endif
 	InitShadows( &m_device );
 	InitScreenSpaceReflections( &m_device, windowWidth, windowHeight );
-	InitSSAO( &m_device, windowWidth, windowHeight );
 	InitDecals( &m_device );
 	InitPreDepth( &m_device, windowWidth, windowHeight );
 	InitSubsurface( &m_device, windowWidth, windowHeight );
@@ -517,15 +414,6 @@ void Application::Cleanup() {
 	// Delete models
 	delete g_modelManager;
 
-	// Destroy Images
-	m_imageDiffuse.Cleanup( &m_device );
-	m_imageNormals.Cleanup( &m_device );
-	m_imageGloss.Cleanup( &m_device );
-	m_imageSpecular.Cleanup( &m_device );
-
-	m_pipeline.Cleanup( &m_device );
-	m_descriptors.Cleanup( &m_device );
-
 	m_pipelineCopy.Cleanup( &m_device );
 	m_descriptorsCopy.Cleanup( &m_device );
 
@@ -540,16 +428,24 @@ void Application::Cleanup() {
 	CleanupDebugDrawLightTiles( &m_device );
 	CleanupDrawTiledGGX( &m_device );
 	CleanupSkybox( &m_device );
+#if !defined( GEN_LIGHTPROBE )
 	CleanupLightProbe( &m_device );
+#endif
+#if defined( USE_SSAO_MULTIPLY )
 	CleanupAmbient( &m_device );
+	CleanupSSAO( &m_device );
+#else
+	CleanupAmbientAO( &m_device );
+#endif
 	CleanupShadows( &m_device );
 	CleanupScreenSpaceReflections( &m_device );
-	CleanupSSAO( &m_device );
 	CleanupDecals( &m_device );
 	CleanupPreDepth( &m_device );
 	CleanupSubsurface( &m_device );
 	CleanupTemporalAntiAliasing( &m_device );
 	CleanupTransparent( &m_device );
+
+	m_modelFullScreen.Cleanup();
 
 	// Delete Samplers
 	Samplers::Cleanup( &m_device );
@@ -584,11 +480,7 @@ Application::ResizeWindow
 void Application::ResizeWindow( int windowWidth, int windowHeight ) {
 	m_device.ResizeWindow( windowWidth, windowHeight );
 
-	// Destroy the pipeline
-	m_pipeline.Cleanup( &m_device );
-
-	// Rebuild the pipeline
-	CreatePipeline( windowWidth, windowHeight );
+	// TODO: Destroy and rebuild any pipelines that also need resizing
 }
 
 
@@ -952,12 +844,14 @@ void Application::DrawFrame() {
 
 	// Update the shadows
 	UpdateShadows( parms );
-
+	
 	DrawPreDepth( parms );
 
 	//
 	//	Fill the g-buffer
 	//
+	UpdateGBufferDescriptors( parms );
+	UpdateDecalDescriptors( parms );
 	g_gbuffer.BeginRenderPass( parms.device, parms.cmdBufferIndex );
 
 	DrawGBuffer( parms );
@@ -965,7 +859,6 @@ void Application::DrawFrame() {
 	DrawDecals( parms );
 
 	g_gbuffer.EndRenderPass( parms.device, parms.cmdBufferIndex );
-	
 
 	// Use the g-buffer in a compute shader to build the list of tiled lights
 	BuildLightTiles( parms );
@@ -976,26 +869,30 @@ void Application::DrawFrame() {
 	//
 	//	Draw to Offscreen Buffer
 	//	
+	UpdateShadowDescriptors( parms );
 	g_offscreenFrameBuffer.m_imageColor.TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL );
 	g_offscreenFrameBuffer.m_imageDepth.TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL );
 	g_offscreenFrameBuffer.BeginRenderPass( &m_device, imageIndex, true, true );
 
 	DrawDepthPrePass( parms );
 	
-	//DrawOffscreen( parms );	// this is an unlit forward rendering to the off screen buffer, only used in older samples
+//	DrawOffscreen( parms );	// this is an unlit forward rendering to the off screen buffer, only used in older samples
 
 	DrawSkybox( parms );
 
 #if !defined( GEN_AMBIENT )
+#if defined( USE_SSAO_MULTIPLY )
 	DrawAmbient( parms );
-
 	DrawSSAO( parms );
+#else
+	DrawAmbientAO( parms );
+#endif	
 #endif
 
 	// Use the g-buffer and list of tiled lights to draw to the off-screen buffer
 	DrawTiledGGX( parms );
 
-#if !defined( GEN_LIGHTPROBE ) && !defined( USE_SSR )
+#if !defined( GEN_LIGHTPROBE ) && !defined( USE_SSR ) && !defined( GEN_AMBIENT )
 	DrawLightProbe( parms );
 #endif
 
@@ -1014,7 +911,9 @@ void Application::DrawFrame() {
 	DrawScreenSpaceReflections( parms );
 #endif
 
+#if defined( USE_TAA )
 	DrawTemporalAntiAliasing( parms );
+#endif
 
 	//
 	//	Draw the offscreen framebuffer to the swap chain frame buffer
@@ -1030,6 +929,7 @@ void Application::DrawFrame() {
 		descriptor.BindImage( g_ssrFrameBuffer.m_imageColor, Samplers::m_samplerStandard, 0 );
 #elif defined( USE_TAA )
 		extern FrameBuffer * g_taaFrameBufferPtr;
+		extern FrameBuffer * g_taaVelocityBufferPtr;
 		descriptor.BindImage( g_taaFrameBufferPtr->m_imageColor, Samplers::m_samplerStandard, 0 );
 #else
 		descriptor.BindImage( g_offscreenFrameBuffer.m_imageColor, Samplers::m_samplerStandard, 0 );

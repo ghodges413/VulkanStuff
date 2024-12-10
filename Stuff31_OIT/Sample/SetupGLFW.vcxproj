@@ -99,6 +99,7 @@
     <ClCompile Include="code\Renderer\BuildSubsurface.cpp" />
     <ClCompile Include="code\Renderer\Common.cpp" />
     <ClCompile Include="code\Renderer\DrawAmbient.cpp" />
+    <ClCompile Include="code\Renderer\DrawAmbientAO.cpp" />
     <ClCompile Include="code\Renderer\DrawDecals.cpp" />
     <ClCompile Include="code\Renderer\DrawGBuffer.cpp" />
     <ClCompile Include="code\Renderer\DrawLightprobe.cpp" />
@@ -203,6 +204,7 @@
     <ClInclude Include="code\Renderer\BuildSubsurface.h" />
     <ClInclude Include="code\Renderer\Common.h" />
     <ClInclude Include="code\Renderer\DrawAmbient.h" />
+    <ClInclude Include="code\Renderer\DrawAmbientAO.h" />
     <ClInclude Include="code\Renderer\DrawDecals.h" />
     <ClInclude Include="code\Renderer\DrawGBuffer.h" />
     <ClInclude Include="code\Renderer\DrawLightprobe.h" />

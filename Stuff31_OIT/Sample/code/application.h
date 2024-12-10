@@ -18,6 +18,7 @@
 #include <set>
 
 #include "Math/Vector.h"
+#include "Renderer/Common.h"
 #include "Graphics/DeviceContext.h"
 #include "Graphics/Buffer.h"
 #include "Graphics/Pipeline.h"
@@ -88,24 +89,14 @@ private:
 	Buffer m_uniformBuffer[ 2 ];
 
 	//
-	//	Texture loaded from file
-	//
-	Image m_imageDiffuse;
-	Image m_imageNormals;
-	Image m_imageGloss;
-	Image m_imageSpecular;
-
-	//
 	//	Descriptor Sets
 	//
-	Descriptors m_descriptors;
 	Descriptors m_descriptorsCopy;
 
 	//
 	//	PipelineState
 	//
-	Pipeline m_pipeline;
-	Pipeline m_pipelineCopy;
+ 	Pipeline m_pipelineCopy;
 
 	Model m_modelFullScreen;
 	
@@ -117,7 +108,6 @@ private:
 
 	void InitializeGLFW();
 	bool InitializeVulkan();
-	bool CreatePipeline( int windowWidth, int windowHeight );
 	void Cleanup();
 	void UpdateUniforms();
 	void DrawFrame();
@@ -142,7 +132,7 @@ private:
 
 	
 
-#if defined( DEBUG )
+#if defined( _DEBUG )
 	static const bool m_enableLayers = true;
 #else
 	static const bool m_enableLayers = false;
