@@ -59,7 +59,7 @@ bool FrameBuffer::Create( DeviceContext * device, CreateParms_t & parms ) {
 			parmsImage.format = VK_FORMAT_R16G16B16A16_SFLOAT;
 			parmsImage.format = VK_FORMAT_R32G32B32A32_SFLOAT;
 		}
-		parmsImage.usageFlags = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+		parmsImage.usageFlags = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
 		if ( !m_imageColor.Create( device, parmsImage ) ) {
 			printf( "ERROR: Failed to create color image\n" );
 			assert( 0 );
