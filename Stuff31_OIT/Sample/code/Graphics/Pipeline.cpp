@@ -136,31 +136,6 @@ bool Pipeline::Create( DeviceContext * device, const CreateParms_t & parms ) {
 	VkPipelineColorBlendAttachmentState colorBlendAttachment = {};
 	colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
 	colorBlendAttachment.blendEnable = VK_FALSE;
-
-	// This is for MRT.  If a framebuffer has multiple render targets and but doesn't setup an equal number of
-	// blend attachment states.  Then only the first color attachment will be rendered into.
-	VkPipelineColorBlendAttachmentState colorBlendAttachments[ 10 ];
-	for ( int i = 0; i < m_parms.numColorAttachments; i++ ) {
-		colorBlendAttachments[ i ].colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-		colorBlendAttachments[ i ].blendEnable = VK_FALSE;
-	}
-
-	VkPipelineColorBlendStateCreateInfo colorBlending = {};
-	colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-	colorBlending.logicOpEnable = VK_FALSE;
-	colorBlending.logicOp = VK_LOGIC_OP_COPY;
-	colorBlending.attachmentCount = 1;
-	colorBlending.pAttachments = &colorBlendAttachment;
-	if ( m_parms.numColorAttachments > 0 ) {
-		colorBlending.attachmentCount = m_parms.numColorAttachments;
-		colorBlending.pAttachments = colorBlendAttachments;
-	}
-	colorBlending.blendConstants[ 0 ] = 0.0f;
-	colorBlending.blendConstants[ 1 ] = 0.0f;
-	colorBlending.blendConstants[ 2 ] = 0.0f;
-	colorBlending.blendConstants[ 3 ] = 0.0f;
-
-	colorBlendAttachment.blendEnable = VK_FALSE;
 	if ( parms.blendMode == BLEND_MODE_ALPHA ) {
 		colorBlendAttachment.blendEnable = VK_TRUE;
 
@@ -192,6 +167,38 @@ bool Pipeline::Create( DeviceContext * device, const CreateParms_t & parms ) {
 		colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
 		colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_MULTIPLY_EXT;
 	}
+
+	// This is for MRT.  If a framebuffer has multiple render targets but doesn't setup an equal number of
+	// blend attachment states, then only the first color attachment will be rendered into.
+	VkPipelineColorBlendAttachmentState colorBlendAttachments[ 10 ];
+	for ( int i = 0; i < m_parms.numColorAttachments; i++ ) {
+		colorBlendAttachments[ i ].colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+		colorBlendAttachments[ i ].blendEnable = VK_FALSE;
+
+		colorBlendAttachments[ i ].srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+		colorBlendAttachments[ i ].dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+		colorBlendAttachments[ i ].colorBlendOp = VK_BLEND_OP_ADD;
+
+		colorBlendAttachments[ i ].srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+		colorBlendAttachments[ i ].dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+		colorBlendAttachments[ i ].alphaBlendOp = VK_BLEND_OP_ADD;
+	}
+
+	VkPipelineColorBlendStateCreateInfo colorBlending = {};
+	colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+	colorBlending.logicOpEnable = VK_FALSE;
+	colorBlending.logicOp = VK_LOGIC_OP_COPY;
+	colorBlending.attachmentCount = 1;
+	colorBlending.pAttachments = &colorBlendAttachment;
+	if ( m_parms.numColorAttachments > 1 ) {
+		colorBlending.attachmentCount = m_parms.numColorAttachments;
+		colorBlending.pAttachments = colorBlendAttachments;
+	}
+	colorBlending.blendConstants[ 0 ] = 0.0f;
+	colorBlending.blendConstants[ 1 ] = 0.0f;
+	colorBlending.blendConstants[ 2 ] = 0.0f;
+	colorBlending.blendConstants[ 3 ] = 0.0f;
+	
 
 	// Check for push constants
 	VkPushConstantRange pushConstantRange = {};
