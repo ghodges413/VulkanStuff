@@ -22,4 +22,5 @@ struct RenderModel;
 bool InitShadows( DeviceContext * device );
 void CleanupShadows( DeviceContext * device );
 void UpdateShadows( DrawParms_t & parms );
+void UpdateShadowDescriptors( DrawParms_t & parms );
 void DrawShadows( DrawParms_t & parms );

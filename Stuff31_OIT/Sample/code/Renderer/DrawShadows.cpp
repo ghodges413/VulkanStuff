@@ -139,7 +139,7 @@ bool InitShadows( DeviceContext * device ) {
 		Pipeline::CreateParms_t pipelineParms;
 		pipelineParms.framebuffer = &g_shadowFrameBuffers[ i ];
 		pipelineParms.descriptors = &g_shadowUpdateDescriptors[ i ];
-		pipelineParms.shader = g_shaderManager->GetShader( "depthPrePass" );
+		pipelineParms.shader = g_shaderManager->GetShader( "depthOnly" );
 		pipelineParms.width = g_shadowFrameBuffers[ i ].m_parms.width;
 		pipelineParms.height = g_shadowFrameBuffers[ i ].m_parms.height;
 		pipelineParms.cullMode = Pipeline::CULL_MODE_FRONT;
@@ -237,14 +237,14 @@ void UpdateShadows( DrawParms_t & parms ) {
 	const int numModels = parms.numModels;
 	VkCommandBuffer cmdBuffer = device->m_vkCommandBuffers[ cmdBufferIndex ];
 
+	std::vector< Descriptor > descriptorList;
+	descriptorList.reserve( numModels );
+
 	//
 	//	Draw the models
 	//
 	for ( int s = 0; s < MAX_SHADOWS; s++ ) {
-		g_shadowFrameBuffers[ s ].m_imageDepth.TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL );
-		g_shadowFrameBuffers[ s ].BeginRenderPass( device, cmdBufferIndex, true, true );
-
-		g_shadowUpdatePipelines[ s ].BindPipeline( cmdBuffer );
+		descriptorList.clear();
 
 		int camOffset = s * sizeof( shadowCamera_t );
 		int camSize = sizeof( shadowCamera_t );
@@ -260,8 +260,25 @@ void UpdateShadows( DrawParms_t & parms ) {
 			descriptor.BindBuffer( &g_shadowCameraUniforms, camOffset, camSize, 0 );					// bind the camera matrices
 			descriptor.BindBuffer( uniforms, renderModel.uboByteOffset, renderModel.uboByteSize, 1 );	// bind the model matrices
 			
-			descriptor.BindDescriptor( device, cmdBuffer, &g_shadowUpdatePipelines[ s ] );
+			descriptor.UpdateDescriptor( device );
+			descriptorList.push_back( descriptor );
+		}
+
+		g_shadowFrameBuffers[ s ].m_imageDepth.TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL );
+		g_shadowFrameBuffers[ s ].BeginRenderPass( device, cmdBufferIndex, true, true );
+
+		g_shadowUpdatePipelines[ s ].BindPipeline( cmdBuffer );
+
+		int idx = 0;
+		for ( int i = 0; i < numModels; i++ ) {
+			const RenderModel & renderModel = renderModels[ i ];
+			if ( NULL == renderModel.modelDraw ) {
+				continue;
+			}
+
+			descriptorList[ idx ].BindDescriptor( cmdBuffer, &g_shadowUpdatePipelines[ s ] );
 			renderModel.modelDraw->DrawIndexed( cmdBuffer );
+			idx++;
 		}
 
 		g_shadowFrameBuffers[ s ].EndRenderPass( device, cmdBufferIndex );
@@ -269,6 +286,48 @@ void UpdateShadows( DrawParms_t & parms ) {
 	}
 
 	g_shadowUpdated = true;
+}
+
+static std::vector< Descriptor > g_descriptorList;
+
+/*
+====================================================
+UpdateShadowDescriptors
+====================================================
+*/
+void UpdateShadowDescriptors( DrawParms_t & parms ) {
+	DeviceContext * device = parms.device;
+	int cmdBufferIndex = parms.cmdBufferIndex;
+	Buffer * uniforms = parms.uniforms;
+	const RenderModel * renderModels = parms.renderModels;
+	const int numModels = parms.numModels;
+	VkCommandBuffer cmdBuffer = device->m_vkCommandBuffers[ cmdBufferIndex ];
+
+	const int camOffset = 0;
+	const int camSize = sizeof( float ) * 16 * 2;
+
+	float push[ 4 ];
+
+	g_descriptorList.reserve( MAX_SHADOWS );
+	g_descriptorList.clear();
+
+	for ( int i = 0; i < MAX_SHADOWS; i++ ) {
+		// Descriptor is how we bind our buffers and images
+		Descriptor descriptor = g_shadowDrawPipeline.GetFreeDescriptor();
+		descriptor.BindBuffer( uniforms, camOffset, camSize, 0 );								// bind the camera matrices
+
+		int offset = i * sizeof( shadowCamera_t );
+		descriptor.BindBuffer( &g_shadowCameraUniforms, offset, sizeof( shadowCamera_t ), 1 );	// bind the model matrices (the shadow camera will be used to transform the ndc model to world space)
+
+		descriptor.BindImage( g_gbuffer.m_imageColor[ 0 ], Samplers::m_samplerRepeat, 2 );
+		descriptor.BindImage( g_gbuffer.m_imageColor[ 1 ], Samplers::m_samplerRepeat, 3 );
+		descriptor.BindImage( g_gbuffer.m_imageColor[ 2 ], Samplers::m_samplerRepeat, 4 );
+
+		descriptor.BindImage( g_shadowFrameBuffers[ i ].m_imageDepth, Samplers::m_samplerStandard, 5 );
+		
+		descriptor.UpdateDescriptor( device );
+		g_descriptorList.push_back( descriptor );
+	}
 }
 
 /*
@@ -292,6 +351,7 @@ void DrawShadows( DrawParms_t & parms ) {
 	//
 	//	Draw the shadowed lights
 	//
+	int idx = 0;
 	g_shadowDrawPipeline.BindPipeline( cmdBuffer );
 	for ( int i = 0; i < MAX_SHADOWS; i++ ) {
 		push[ 0 ] = g_shadowLights[ i ].dim;
@@ -301,21 +361,9 @@ void DrawShadows( DrawParms_t & parms ) {
 
 		g_shadowDrawPipeline.BindPushConstant( cmdBuffer, 0, sizeof( float ) * 4, push );
 
-		// Descriptor is how we bind our buffers and images
-		Descriptor descriptor = g_shadowDrawPipeline.GetFreeDescriptor();
-		descriptor.BindBuffer( uniforms, camOffset, camSize, 0 );								// bind the camera matrices
-
-		int offset = i * sizeof( shadowCamera_t );
-		descriptor.BindBuffer( &g_shadowCameraUniforms, offset, sizeof( shadowCamera_t ), 1 );	// bind the model matrices (the shadow camera will be used to transform the ndc model to world space)
-
-		descriptor.BindImage( g_gbuffer.m_imageColor[ 0 ], Samplers::m_samplerRepeat, 2 );
-		descriptor.BindImage( g_gbuffer.m_imageColor[ 1 ], Samplers::m_samplerRepeat, 3 );
-		descriptor.BindImage( g_gbuffer.m_imageColor[ 2 ], Samplers::m_samplerRepeat, 4 );
-
-		descriptor.BindImage( g_shadowFrameBuffers[ i ].m_imageDepth, Samplers::m_samplerStandard, 5 );
-		
-		descriptor.BindDescriptor( device, cmdBuffer, &g_shadowDrawPipeline );
+		g_descriptorList[ idx ].BindDescriptor( cmdBuffer, &g_shadowDrawPipeline );
 		g_shadowModel.DrawIndexed( cmdBuffer );
+		idx++;
 	}
 }
 
