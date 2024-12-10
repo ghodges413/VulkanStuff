@@ -190,7 +190,7 @@ bool GetFileData( const char * fileNameLocal, unsigned char ** data, unsigned in
 	
 	// handle any errors
 	if ( file == NULL ) {
-		printf("ERROR: open file failed: %s\n", fileName );
+//		printf("ERROR: open file failed: %s\n", fileName );
 		return false;
 	}
 	
@@ -260,7 +260,7 @@ bool WriteFileData( const char * fileNameLocal, const void * data, const unsigne
 
 	// handle any errors
 	if ( file == NULL ) {
-		printf( "ERROR: open file failed: %s\n", fileName );
+		printf( "ERROR: open file for write failed: %s\n", fileName );
 		return false;
 	}
 
@@ -291,7 +291,7 @@ bool OpenFileWriteStream( const char * fileNameLocal ) {
 
 	// handle any errors
 	if ( g_fileStream == NULL ) {
-		printf( "ERROR: open file failed: %s\n", fileName );
+		printf( "ERROR: open file for write stream failed: %s\n", fileName );
 		return false;
 	}
 
@@ -370,7 +370,7 @@ int GetFileTimeStampWrite( const char * fileNameLocal ) {
 	HANDLE hFile;
     hFile = CreateFileA( fileName, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL );
     if ( INVALID_HANDLE_VALUE == hFile ) {
-        printf( "CreateFile failed with %d  %s\n", GetLastError(), fileName );
+//        printf( "CreateFile failed with %d  %s\n", GetLastError(), fileName );
         return -1;
     }
 
