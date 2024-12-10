@@ -167,7 +167,7 @@ bool LoadMap( DeviceContext * device ) {
 		indices.push_back( g_quakeIndices[ i ] );
 	}
 	g_quakeModel.m_indices = indices;
-	g_quakeModel.MakeVBO( device );
+	//g_quakeModel.MakeVBO( device );
 
 	Bounds bounds;
 	for ( int i = 0; i < g_quakeModel.m_vertices.size(); i++ ) {
