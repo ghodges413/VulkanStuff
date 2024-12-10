@@ -11,7 +11,7 @@
 #include <stdio.h>
 #include <vector>
 
-#pragma optimize( "", off )
+ 
 
 Pipeline	g_depthPrePassGBufferPipeline;
 Descriptors	g_depthPrePassGBufferDescriptors;

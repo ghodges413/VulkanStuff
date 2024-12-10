@@ -12,7 +12,7 @@
 #include <stdio.h>
 #include <vector>
 
-#pragma optimize( "", off )
+ 
 
 #define MAX_SHADOWS 4
 

@@ -4,7 +4,7 @@
 #include "Bounds.h"
 #include "../Physics/Body.h"
 
-#pragma optimize( "", off )
+ 
 
 /*
 ====================================================

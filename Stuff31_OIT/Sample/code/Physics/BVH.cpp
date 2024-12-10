@@ -8,7 +8,7 @@
 #include "Math/Morton.h"
 #include <stack>
 
-#pragma optimize( "", off )
+ 
 
 int TestRadixSort();
 

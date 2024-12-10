@@ -3,7 +3,7 @@
 //
 #include "Threading/Threads.h"
 
-#pragma optimize( "", off )	// For some reason, optimizing this file causes the job system to wait forever
+//#pragma optimize( "", off )	// For some reason, optimizing this file causes the job system to wait forever
 
 /*
 ====================================================

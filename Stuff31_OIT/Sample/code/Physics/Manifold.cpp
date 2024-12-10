@@ -6,7 +6,7 @@
 #include "Physics/Constraints.h"
 #include "Physics/Manifold.h"
 
-#pragma optimize( "", off )
+ 
 
 /*
 ========================================================================================================

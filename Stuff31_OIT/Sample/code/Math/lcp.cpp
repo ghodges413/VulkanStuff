@@ -3,7 +3,7 @@
 //
 #include "lcp.h"
 
-#pragma optimize( "", off )
+ 
 
 /*
 ================================

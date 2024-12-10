@@ -57,7 +57,7 @@ void Fourier::InverseDFT( const Complex * data_in, const int num, Complex * data
 	}
 }
 
-#pragma optimize( "", off )
+ 
 
 /*
 ================================
@@ -1651,7 +1651,7 @@ void Fourier::PrintReorder8_512() {
 	delete[] data;
 }
 
-#pragma optimize( "", off )
+ 
 
 /*
  ================================
