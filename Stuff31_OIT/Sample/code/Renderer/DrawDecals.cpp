@@ -254,6 +254,49 @@ void CleanupDecals( DeviceContext * device ) {
 	g_decalModel.Cleanup();
 }
 
+static std::vector< Descriptor > g_descriptorList;
+
+/*
+====================================================
+UpdateDecalDescriptors
+====================================================
+*/
+void UpdateDecalDescriptors( DrawParms_t & parms ) {
+	DeviceContext * device = parms.device;
+	int cmdBufferIndex = parms.cmdBufferIndex;
+	Buffer * uniforms = parms.uniforms;
+	const RenderModel * renderModels = parms.renderModels;
+	const int numModels = parms.numModels;
+	VkCommandBuffer cmdBuffer = device->m_vkCommandBuffers[ cmdBufferIndex ];
+
+	const int camOffset = 0;
+	const int camSize = sizeof( float ) * 16 * 2;
+
+	g_descriptorList.reserve( NUM_DECALS );
+	g_descriptorList.clear();
+
+	for ( int i = 0; i < NUM_DECALS; i++ ) {
+		// Descriptor is how we bind our buffers and images
+		Descriptor descriptor = g_decalPipeline.GetFreeDescriptor();
+		descriptor.BindBuffer( uniforms, camOffset, camSize, 0 );								// bind the camera matrices
+
+		int offset = i * sizeof( decalCamera_t );
+		descriptor.BindBuffer( &g_decalUniforms, offset, sizeof( decalCamera_t ), 1 );	// bind the model matrices (the shadow camera will be used to transform the ndc model to world space)
+
+		int matId = g_decals[ i ].imageId;
+		descriptor.BindImage( g_materials[ matId ].imageDiffuse, Samplers::m_samplerStandard, 2 );
+		descriptor.BindImage( g_materials[ matId ].imageNormals, Samplers::m_samplerStandard, 3 );
+		descriptor.BindImage( g_materials[ matId ].imageRoughness, Samplers::m_samplerStandard, 4 );
+		descriptor.BindImage( g_materials[ matId ].imageSpecular, Samplers::m_samplerStandard, 5 );
+		descriptor.BindImage( g_materials[ matId ].imageMask, Samplers::m_samplerStandard, 6 );
+
+		descriptor.BindImage( g_preDepthFrameBuffer.m_imageDepth, Samplers::m_samplerStandard, 7 );
+		
+		descriptor.UpdateDescriptor( device );
+		g_descriptorList.push_back( descriptor );
+	}
+}
+
 /*
 ====================================================
 DrawDecals
@@ -275,23 +318,7 @@ void DrawDecals( DrawParms_t & parms ) {
 	//
 	g_decalPipeline.BindPipeline( cmdBuffer );
 	for ( int i = 0; i < NUM_DECALS; i++ ) {
-		// Descriptor is how we bind our buffers and images
-		Descriptor descriptor = g_decalPipeline.GetFreeDescriptor();
-		descriptor.BindBuffer( uniforms, camOffset, camSize, 0 );								// bind the camera matrices
-
-		int offset = i * sizeof( decalCamera_t );
-		descriptor.BindBuffer( &g_decalUniforms, offset, sizeof( decalCamera_t ), 1 );	// bind the model matrices (the shadow camera will be used to transform the ndc model to world space)
-
-		int matId = g_decals[ i ].imageId;
-		descriptor.BindImage( g_materials[ matId ].imageDiffuse, Samplers::m_samplerStandard, 2 );
-		descriptor.BindImage( g_materials[ matId ].imageNormals, Samplers::m_samplerStandard, 3 );
-		descriptor.BindImage( g_materials[ matId ].imageRoughness, Samplers::m_samplerStandard, 4 );
-		descriptor.BindImage( g_materials[ matId ].imageSpecular, Samplers::m_samplerStandard, 5 );
-		descriptor.BindImage( g_materials[ matId ].imageMask, Samplers::m_samplerStandard, 6 );
-
-		descriptor.BindImage( g_preDepthFrameBuffer.m_imageDepth, Samplers::m_samplerStandard, 7 );
-		
-		descriptor.BindDescriptor( device, cmdBuffer, &g_decalPipeline );
+		g_descriptorList[ i ].BindDescriptor( cmdBuffer, &g_decalPipeline );
 		g_decalModel.DrawIndexed( cmdBuffer );
 	}
 }

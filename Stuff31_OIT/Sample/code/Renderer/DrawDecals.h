@@ -10,4 +10,5 @@
 
 bool InitDecals( DeviceContext * device );
 void CleanupDecals( DeviceContext * device );
+void UpdateDecalDescriptors( DrawParms_t & parms );
 void DrawDecals( DrawParms_t & parms );
