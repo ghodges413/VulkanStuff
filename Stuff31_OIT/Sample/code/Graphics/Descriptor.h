@@ -30,6 +30,8 @@ public:
 
 	void BindAccelerationStructure( AccelerationStructure * accelerationStructure, int slot );
 
+	void UpdateDescriptor( DeviceContext * device );
+	void BindDescriptor( VkCommandBuffer vkCommandBuffer, Pipeline * pso );
 	void BindDescriptor( DeviceContext * device, VkCommandBuffer vkCommandBuffer, Pipeline * pso );
 
 	friend class Descriptors;
@@ -91,7 +93,7 @@ public:
 	// This structure could effectively create the layout
 	struct CreateParms_t {
 		pipelineType_t type;
-		int maxDescriptors;
+		int maxDescriptorSets;
 
 		int numUniformsTask;
 		int numStorageBuffersTask;
@@ -127,7 +129,7 @@ public:
 	CreateParms_t m_parms;
 	bool m_wasBuilt;
 
-	static const int MAX_DESCRIPTOR_SETS = 4096;//64;//256;
+	static const int MAX_DESCRIPTOR_SETS = 4096 * 3;
 
 	// The pool is the object that allocates all our descriptor sets
 	VkDescriptorPool m_vkDescriptorPool;
@@ -141,9 +143,11 @@ public:
 
 
 	Descriptor GetFreeDescriptor() {
+		const int maxDescriptorSets = ( m_parms.maxDescriptorSets > 0 ) ? m_parms.maxDescriptorSets : MAX_DESCRIPTOR_SETS;
+
 		Descriptor descriptor;
 		descriptor.m_parent = this;
-		descriptor.m_id = m_numDescriptorUsed % MAX_DESCRIPTOR_SETS;
+		descriptor.m_id = m_numDescriptorUsed % maxDescriptorSets;
 		m_numDescriptorUsed++;
 		return descriptor;
 	}

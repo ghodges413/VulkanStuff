@@ -53,35 +53,36 @@ bool Descriptors::Create( DeviceContext * device, const CreateParms_t & parms ) 
 	const int numStorageImages	= parms.numStorageImagesVertex + parms.numStorageImagesCompute + parms.numStorageImagesTask + parms.numStorageImagesRayGen;
 	const int numStorageBuffers = parms.numStorageBuffersFragment + parms.numStorageBuffersVertex + parms.numStorageBuffersCompute + parms.numStorageBuffersMesh + parms.numStorageBuffersTask + parms.numStorageBuffersClosestHit;
 	const int numUniformBuffers	= parms.numUniformsFragment + parms.numUniformsVertex + parms.numUniformsCompute + parms.numUniformsMesh + parms.numUniformsTask + parms.numUniformsRayGen;
+	const int maxDescriptorSets = ( parms.maxDescriptorSets > 0 ) ? parms.maxDescriptorSets : MAX_DESCRIPTOR_SETS;
 
 	if ( numUniformBuffers > 0 ) {
 		VkDescriptorPoolSize poolSize;
 		poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		poolSize.descriptorCount = numUniformBuffers * MAX_DESCRIPTOR_SETS;
+		poolSize.descriptorCount = numUniformBuffers * maxDescriptorSets;
 		poolSizes.push_back( poolSize );
 	}
 	if ( numSamplerImages > 0 ) {
 		VkDescriptorPoolSize poolSize;
 		poolSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		poolSize.descriptorCount = numSamplerImages * MAX_DESCRIPTOR_SETS;
+		poolSize.descriptorCount = numSamplerImages * maxDescriptorSets;
 		poolSizes.push_back( poolSize );
 	}
 	if ( numStorageImages > 0 ) {
 		VkDescriptorPoolSize poolSize;
 		poolSize.type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-		poolSize.descriptorCount = numStorageImages * MAX_DESCRIPTOR_SETS;
+		poolSize.descriptorCount = numStorageImages * maxDescriptorSets;
 		poolSizes.push_back( poolSize );
 	}
 	if ( numStorageBuffers > 0 ) {
 		VkDescriptorPoolSize poolSize;
 		poolSize.type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-		poolSize.descriptorCount = numStorageBuffers * MAX_DESCRIPTOR_SETS;
+		poolSize.descriptorCount = numStorageBuffers * maxDescriptorSets;
 		poolSizes.push_back( poolSize );
 	}
 	if ( parms.numAccelerationStructures > 0 ) {
 		VkDescriptorPoolSize poolSize;
 		poolSize.type = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NV;
-		poolSize.descriptorCount = parms.numAccelerationStructures * MAX_DESCRIPTOR_SETS;
+		poolSize.descriptorCount = parms.numAccelerationStructures * maxDescriptorSets;
 		poolSizes.push_back( poolSize );
 	}
 
@@ -89,7 +90,7 @@ bool Descriptors::Create( DeviceContext * device, const CreateParms_t & parms ) 
 	poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
 	poolInfo.poolSizeCount = static_cast< uint32_t >( poolSizes.size() );
 	poolInfo.pPoolSizes = poolSizes.data();
-	poolInfo.maxSets = MAX_DESCRIPTOR_SETS;
+	poolInfo.maxSets = maxDescriptorSets;
 	poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
 
 	result = vkCreateDescriptorPool( device->m_vkDevice, &poolInfo, nullptr, &m_vkDescriptorPool );
@@ -353,7 +354,7 @@ bool Descriptors::Create( DeviceContext * device, const CreateParms_t & parms ) 
 	VkDescriptorSetAllocateInfo allocInfo = {};
 	allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
 	allocInfo.descriptorPool = m_vkDescriptorPool;
-	allocInfo.descriptorSetCount = MAX_DESCRIPTOR_SETS;
+	allocInfo.descriptorSetCount = maxDescriptorSets;
 	allocInfo.pSetLayouts = layouts;
 
 	result = vkAllocateDescriptorSets( device->m_vkDevice, &allocInfo, m_vkDescriptorSets );
@@ -374,8 +375,10 @@ Descriptors::Create
 */
 void Descriptors::Cleanup( DeviceContext * device ) {
 	if ( m_wasBuilt ) {
+		const int maxDescriptorSets = ( m_parms.maxDescriptorSets > 0 ) ? m_parms.maxDescriptorSets : MAX_DESCRIPTOR_SETS;
+
 		// Free the descriptor sets
-		vkFreeDescriptorSets( device->m_vkDevice, m_vkDescriptorPool, MAX_DESCRIPTOR_SETS, m_vkDescriptorSets );
+		vkFreeDescriptorSets( device->m_vkDevice, m_vkDescriptorPool, maxDescriptorSets, m_vkDescriptorSets );
 
 		// Destroy descriptor set layout
 		vkDestroyDescriptorSetLayout( device->m_vkDevice, m_vkDescriptorSetLayout, nullptr );
@@ -505,6 +508,17 @@ Descriptor::BindDescriptor
 ====================================================
 */
 void Descriptor::BindDescriptor( DeviceContext * device, VkCommandBuffer vkCommandBuffer, Pipeline * pso ) {
+	UpdateDescriptor( device );
+	BindDescriptor( vkCommandBuffer, pso );
+}
+
+
+/*
+====================================================
+Descriptor::UpdateDescriptor
+====================================================
+*/
+void Descriptor::UpdateDescriptor( DeviceContext * device ) {
 	const int numDescriptors = m_numImages + m_numBuffers + m_numStorageImages + m_numStorageBuffers + m_numAccelerationStructure;
 	const int allocationSize = sizeof( VkWriteDescriptorSet ) * numDescriptors;
 	VkWriteDescriptorSet * descriptorWrites = (VkWriteDescriptorSet *)alloca( allocationSize );
@@ -579,7 +593,15 @@ void Descriptor::BindDescriptor( DeviceContext * device, VkCommandBuffer vkComma
 
 	// Bind the uniforms
 	vkUpdateDescriptorSets( device->m_vkDevice, (uint32_t)numDescriptors, descriptorWrites, 0, nullptr );
+}
 
+
+/*
+====================================================
+Descriptor::BindDescriptor
+====================================================
+*/
+void Descriptor::BindDescriptor( VkCommandBuffer vkCommandBuffer, Pipeline * pso ) {
 	VkPipelineBindPoint bindPoint;
 	switch ( m_parent->m_parms.type ) {
 		default:
