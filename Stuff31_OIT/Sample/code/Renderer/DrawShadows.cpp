@@ -233,8 +233,8 @@ void UpdateShadows( DrawParms_t & parms ) {
 	DeviceContext * device = parms.device;
 	int cmdBufferIndex = parms.cmdBufferIndex;
 	Buffer * uniforms = parms.uniforms;
-	const RenderModel * renderModels = parms.renderModels;
-	const int numModels = parms.numModels;
+	const RenderModel * renderModels = parms.notCulledRenderModels;
+	const int numModels = parms.numNotCulledRenderModels;
 	VkCommandBuffer cmdBuffer = device->m_vkCommandBuffers[ cmdBufferIndex ];
 
 	std::vector< Descriptor > descriptorList;

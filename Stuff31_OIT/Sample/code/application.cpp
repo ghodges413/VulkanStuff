@@ -10,6 +10,7 @@
 #include "Graphics/Samplers.h"
 #include "Graphics/shader.h"
 #include "Graphics/Barrier.h"
+#include "Math/Frustum.h"
 #include "Miscellaneous/Fileio.h"
 #include "Miscellaneous/Time.h"
 #include "Miscellaneous/Input.h"
@@ -155,7 +156,7 @@ void Application::Initialize() {
 	//	Add "entities" for every position that is inside a brush
 	//
 	m_entities.clear();
-	for ( float z = bounds.mins.z; z < bounds.maxs.z; z += 1.0f ) {
+	for ( float z = bounds.mins.z + 1.0f; z < bounds.maxs.z + 1.0f; z += 1.0f ) {
 		for ( float y = bounds.mins.y; y < bounds.maxs.y; y += 1.0f ) {
 			for ( float x = bounds.mins.x; x < bounds.maxs.x; x += 1.0f ) {
 				Vec3 pos = Vec3( x, y, z );
@@ -617,6 +618,7 @@ const Vec2 g_halton[ 16 ] = {
 int g_frame = 0;
 
 Camera_t g_camera;
+Frustum g_frustum;
 
 /*
 ====================================================
@@ -693,6 +695,10 @@ void Application::UpdateUniforms() {
 			camUp = Vec3( 0, 0, 1 );
 			fovy = 90;
 #endif
+			// Build the camera frustum
+			Vec3 camLook = camLookAt - camPos;
+			camLook.Normalize();
+			g_frustum.Build( zNear, zFar, fovy, windowWidth, windowHeight, camPos, camUp, camLook );
 
 			// For TAA, we add a subpixel offset to the camera position
 			Mat4 matJitterTAA;
@@ -776,6 +782,7 @@ void Application::UpdateUniforms() {
 			}
 			renderModel.uboByteOffset = uboByteOffset;
 			renderModel.uboByteSize = sizeof( matOrient );
+			renderModel.pos = entity.pos;
 			m_renderModels.push_back( renderModel );
 
 			// Update the uniform buffer with the orientation of this entity
@@ -826,6 +833,24 @@ Application::DrawFrame
 void Application::DrawFrame() {
 	UpdateUniforms();
 
+	std::vector< RenderModel > culledRenderModels;
+	culledRenderModels.reserve( m_renderModels.size() );
+
+	for ( int i = 0; i < m_renderModels.size(); i++ ) {
+		const RenderModel & renderModel = m_renderModels[ i ];
+		const Vec3 & pos = renderModel.pos;
+		Bounds bounds = renderModel.modelDraw->m_bounds;
+
+		bounds.mins += pos;
+		bounds.maxs += pos;
+
+		if ( g_frustum.DoBoundsIntersectFrustum( bounds ) ) {
+			culledRenderModels.push_back( m_renderModels[ i ] );
+		}
+	}
+	printf( "   Num models culled: %i", m_renderModels.size() - culledRenderModels.size() );
+	printf( "   Num models drawn: %i", culledRenderModels.size() );
+
 	//
 	//	Begin the render frame
 	//
@@ -837,8 +862,10 @@ void Application::DrawFrame() {
 	parms.cmdBufferIndex = imageIndex;
 	parms.uniforms = &m_uniformBuffer[ g_frame % 2 ];
 	parms.uniformsOld = &m_uniformBuffer[ ( g_frame + 1 ) % 2 ];
-	parms.renderModels = m_renderModels.data();
-	parms.numModels = (int)m_renderModels.size();
+	parms.renderModels = culledRenderModels.data();
+	parms.numModels = (int)culledRenderModels.size();
+	parms.notCulledRenderModels = m_renderModels.data();
+	parms.numNotCulledRenderModels = (int)m_renderModels.size();
 	parms.time = m_timeAccumuledSeconds;
 	parms.camera = g_camera;
 

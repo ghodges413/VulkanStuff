@@ -36,6 +36,8 @@ struct DrawParms_t {
 	Buffer * uniformsOld;
 	RenderModel * renderModels;
 	int numModels;
+	RenderModel * notCulledRenderModels;
+	int numNotCulledRenderModels;
 	float time;
 	Camera_t camera;
 };

@@ -36,14 +36,16 @@ public:
                   const Vec3 & camPos,
                   const Vec3 & camUp,
                   const Vec3 & camLook );
-    void MoveNearPlane( const float & near, const Vec3 & camPos, const Vec3 & camLook );
-    void Build( const float * mat );
-    void Build( const float * proj, const float * view );
-	void Build( const Mat4 & mat );
+//     void Build( const float * mat );
+//     void Build( const float * proj, const float * view );
+// 	void Build( const Mat4 & mat );
     
     //bool IsSphereInFrustum( const Sphere & sphere ) const;
-    bool IsBoxInFrustum( const Bounds & box ) const;
-	bool IntersectBox( const Bounds & box ) const;
+//     bool IsBoxInFrustum( const Bounds & box ) const;
+// 	bool IntersectBox( const Bounds & box ) const;
+    bool DoBoundsIntersectFrustum( const Bounds & box ) const;
+    bool IsPointInFrustum( const Vec3 & pt ) const;
+    bool IsSphericalPointInFrustum( const Vec3 & pt, const float radius ) const;
 	//bool IntersectSphere( const Sphere & sphere ) const;
     
 private:
@@ -58,4 +60,10 @@ public:
 
     Vec3   m_corners[ 8 ];
     Bounds  m_bounds;
+
+    Vec3 m_camPos;  // For debug purposes
+    Vec3 m_camLookDir;
+    Vec3 m_camUp;
+    float m_fovRad;
+    float m_fovDeg;
 };
