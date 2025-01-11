@@ -241,18 +241,18 @@ CleanupAtmosphere
 ====================================================
 */
 bool CleanupAtmosphere( DeviceContext * device ) {
+	g_atmosPipeline.Cleanup( device );
+	g_atmosDescriptors.Cleanup( device );
 	g_atmosModel.Cleanup();
 	g_atmosUniforms.Cleanup( device );
 
-	g_atmosPipeline.Cleanup( device );
-	g_atmosDescriptors.Cleanup( device );
-
+	g_sunShadowFrameBuffer.Cleanup( device );
+	g_sunShadowUpdatePipeline.Cleanup( device );
+	g_sunShadowUpdateDescriptors.Cleanup( device );
+	
 	g_transmittanceImage.Cleanup( device );
 	g_irradianceImage.Cleanup( device );
 	g_scatterimage.Cleanup( device );
-
-	g_sunShadowFrameBuffer.Cleanup( device );
-	g_sunShadowUpdatePipeline.Cleanup( device );
 
 	return true;
 }
