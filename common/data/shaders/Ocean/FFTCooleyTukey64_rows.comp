@@ -1,0 +1,576 @@
+#version 450
+//#extension GL_GOOGLE_include_directive : enable
+
+//#include "FFTTwiddles.comp"
+
+
+#define PI				3.141592653589793
+#define INV_ROOT2		0.70710678118654752440084436210485
+#define COS_PIOVER8		0.92387953251128675612818318939679
+#define COS_3PIOVER8	0.3826834323650897717284599840304
+#define COS_PIOVER16	0.98078528040323044912618223613424
+#define COS_3PIOVER16	0.83146961230254523707878837761791
+#define COS_5PIOVER16	0.55557023301960222474283081394853
+#define COS_7PIOVER16	0.19509032201612826784828486847702
+
+/*
+==========================
+Complex
+==========================
+*/
+vec2 Complex( in float angle ) {
+	vec2 c;
+	c.x = cos( angle );
+	c.y = sin( angle );
+	return c;
+}
+
+/*
+==========================
+ComplexMultiply
+==========================
+*/
+vec2 ComplexMultiply( in vec2 a, in vec2 b ) {
+	vec2 c;
+	c.x = a.x * b.x - a.y * b.y;
+	c.y = a.x * b.y + a.y * b.x;
+	return c;
+}
+
+/*
+ ==========================
+ FFT2
+ ==========================
+ */
+void FFT2( inout vec2 a, inout vec2 b ) {
+	vec2 tmp = a;
+	
+	a = a + b;
+	b = tmp - b;
+}
+
+/*
+ ==========================
+ FFT4
+ ==========================
+ */
+void FFT4( inout vec2 data[ 4 ] ) {
+	vec2 d0 = data[ 0 ];
+	vec2 d1 = data[ 1 ];
+	vec2 d2 = data[ 2 ];
+	vec2 d3 = data[ 3 ];
+	
+	vec2 jd1 = vec2( -d1.y, d1.x );
+	vec2 jd3 = vec2( -d3.y, d3.x );
+	
+	//vec2 jd1 = ComplexMultiply( vec2( 0.0, 1.0 ), d1 );
+	//vec2 jd3 = ComplexMultiply( vec2( 0.0, 1.0 ), d3 );
+	
+	data[ 0 ] = ( d0 +  d1 + d2 +  d3 );
+	data[ 2 ] = ( d0 - jd1 - d2 + jd3 );
+	data[ 1 ] = ( d0 -  d1 + d2 -  d3 );
+	data[ 3 ] = ( d0 + jd1 - d2 - jd3 );
+}
+
+/*
+ ==========================
+ FFT4_alt
+ ==========================
+ */
+void FFT4_alt( inout vec2 d0, inout vec2 d1, inout vec2 d2, inout vec2 d3 ) {
+	// FFT on columns
+	FFT2( d0, d2 );
+	FFT2( d1, d3 );
+	
+	// Twiddles
+	d3 = vec2( d3.y, -d3.x );
+	
+	// FFT on rows
+	FFT2( d0, d1 );
+	FFT2( d2, d3 );
+	
+	// Transpose
+	vec2 tmp = d1;
+	d1 = d2;
+	d2 = tmp;
+}
+
+/*
+ ==========================
+ FFT4_inv
+ ==========================
+ */
+void FFT4_inv( inout vec2 d0, inout vec2 d1, inout vec2 d2, inout vec2 d3 ) {
+	// FFT on columns
+	FFT2( d0, d2 );
+	FFT2( d1, d3 );
+	
+	// Twiddles
+	d3 = vec2( -d3.y, d3.x );
+	
+	// FFT on rows
+	FFT2( d0, d1 );
+	FFT2( d2, d3 );
+	
+	// Transpose
+	vec2 tmp = d1;
+	d1 = d2;
+	d2 = tmp;
+}
+
+/*
+ ==========================
+ FFT8
+ ==========================
+ */
+void FFT8( inout vec2 data[ 8 ] ) {
+	vec2 d0 = data[ 0 ];
+	vec2 d1 = data[ 1 ];
+	vec2 d2 = data[ 2 ];
+	vec2 d3 = data[ 3 ];
+	vec2 d4 = data[ 4 ];
+	vec2 d5 = data[ 5 ];
+	vec2 d6 = data[ 6 ];
+	vec2 d7 = data[ 7 ];
+	
+	vec2 jd1 = vec2( -d1.y, d1.x );
+	vec2 wd1 = ComplexMultiply( vec2( INV_ROOT2, INV_ROOT2 ), d1 );
+	vec2 md1 = ComplexMultiply( vec2( INV_ROOT2, -INV_ROOT2 ), d1 );
+	
+	vec2 jd2 = vec2( -d2.y, d2.x );
+	
+	vec2 jd3 = vec2( -d3.y, d3.x );
+	vec2 wd3 = ComplexMultiply( vec2( INV_ROOT2, INV_ROOT2 ), d3 );
+	vec2 md3 = ComplexMultiply( vec2( INV_ROOT2, -INV_ROOT2 ), d3 );
+	
+	vec2 jd5 = vec2( -d5.y, d5.x );
+	vec2 wd5 = ComplexMultiply( vec2( INV_ROOT2, INV_ROOT2 ), d5 );
+	vec2 md5 = ComplexMultiply( vec2( INV_ROOT2, -INV_ROOT2 ), d5 );
+	
+	vec2 jd6 = vec2( -d6.y, d6.x );
+	
+	vec2 jd7 = vec2( -d7.y, d7.x );
+	vec2 wd7 = ComplexMultiply( vec2( INV_ROOT2, INV_ROOT2 ), d7 );
+	vec2 md7 = ComplexMultiply( vec2( INV_ROOT2, -INV_ROOT2 ), d7 );
+
+	data[ 0 ] = d0 +  d1 +  d2 +  d3 + d4 +  d5 +  d6 +  d7;
+	data[ 1 ] = d0 + md1 - jd2 - wd3 - d4 - md5 + jd6 + wd7;
+	data[ 2 ] = d0 - jd1 -  d2 + jd3 + d4 - jd5 -  d6 + jd7;
+	data[ 3 ] = d0 - wd1 + jd2 + md3 - d4 + wd5 - jd6 - md7;
+	data[ 4 ] = d0 -  d1 +  d2 -  d3 + d4 -  d5 +  d6 -  d7;
+	data[ 5 ] = d0 - md1 - jd2 + wd3 - d4 + md5 + jd6 - wd7;
+	data[ 6 ] = d0 + jd1 -  d2 - jd3 + d4 + jd5 -  d6 - jd7;
+	data[ 7 ] = d0 + wd1 + jd2 - md3 - d4 - wd5 - jd6 + md7;
+}
+
+/*
+ ==========================
+ FFT8_alt
+ ==========================
+ */
+void FFT8_alt( inout vec2 d0, inout vec2 d1, inout vec2 d2, inout vec2 d3, inout vec2 d4, inout vec2 d5, inout vec2 d6, inout vec2 d7 ) {
+	// FFT on columns
+	FFT4_alt( d0, d2, d4, d6 );
+	FFT4_alt( d1, d3, d5, d7 );
+	
+	// Twiddles
+	d3 = ComplexMultiply( d3, vec2( INV_ROOT2, -INV_ROOT2 ) );
+	d5 = vec2( d5.y, -d5.x );
+	d7 = ComplexMultiply( d7, vec2( -INV_ROOT2, -INV_ROOT2 ) );
+	
+	// FFT on rows
+	FFT2( d0, d1 );
+	FFT2( d2, d3 );
+	FFT2( d4, d5 );
+	FFT2( d6, d7 );
+	
+	// Transpose
+	vec2 tmpA;
+	vec2 tmpB;
+	
+	tmpA = d4;
+	d4 = d1;
+	tmpB = d2;
+	d2 = tmpA;
+	d1 = tmpB;
+	
+	tmpA = d3;
+	d3 = d6;
+	tmpB = d5;
+	d5 = tmpA;
+	d6 = tmpB;
+}
+
+/*
+ ==========================
+ FFT8_inv
+ ==========================
+ */
+void FFT8_inv( inout vec2 d0, inout vec2 d1, inout vec2 d2, inout vec2 d3, inout vec2 d4, inout vec2 d5, inout vec2 d6, inout vec2 d7 ) {
+	// FFT on columns
+	FFT4_inv( d0, d2, d4, d6 );
+	FFT4_inv( d1, d3, d5, d7 );
+	
+	// Twiddles
+	d3 = ComplexMultiply( d3, vec2( INV_ROOT2, INV_ROOT2 ) );
+	d5 = vec2( -d5.y, d5.x );
+	d7 = ComplexMultiply( d7, vec2( -INV_ROOT2, INV_ROOT2 ) );
+	
+	// FFT on rows
+	FFT2( d0, d1 );
+	FFT2( d2, d3 );
+	FFT2( d4, d5 );
+	FFT2( d6, d7 );
+	
+	// Transpose
+	vec2 tmpA;
+	vec2 tmpB;
+	
+	tmpA = d4;
+	d4 = d1;
+	tmpB = d2;
+	d2 = tmpA;
+	d1 = tmpB;
+	
+	tmpA = d3;
+	d3 = d6;
+	tmpB = d5;
+	d5 = tmpA;
+	d6 = tmpB;
+}
+
+/*
+ ==========================
+ FFT16
+ ==========================
+ */
+void FFT16( inout vec2 data[ 16 ] ) {
+	// FFT on columns
+	FFT4_alt( data[ 0 ], data[ 4 ], data[ 8 ], data[ 12 ] );
+	FFT4_alt( data[ 1 ], data[ 5 ], data[ 9 ], data[ 13 ] );
+	FFT4_alt( data[ 2 ], data[ 6 ], data[ 10], data[ 14 ] );
+	FFT4_alt( data[ 3 ], data[ 7 ], data[ 11], data[ 15 ] );
+	
+	// Twiddles
+	data[ 5 ] = ComplexMultiply( data[ 5 ], vec2( COS_PIOVER8, -COS_3PIOVER8 ) );
+	data[ 6 ] = ComplexMultiply( data[ 6 ], vec2( INV_ROOT2, -INV_ROOT2 ) );
+	data[ 7 ] = ComplexMultiply( data[ 7 ], vec2( COS_3PIOVER8, -COS_PIOVER8 ) );
+	
+	data[ 9 ] = ComplexMultiply( data[ 9 ], vec2( INV_ROOT2, -INV_ROOT2 ) );
+	data[ 10] = vec2( data[ 10].y, -data[ 10].x );
+	data[ 11] = ComplexMultiply( data[ 11], vec2( -INV_ROOT2, -INV_ROOT2 ) );
+	
+	data[ 13] = ComplexMultiply( data[ 13], vec2( COS_3PIOVER8, -COS_PIOVER8 ) );
+	data[ 14] = ComplexMultiply( data[ 14], vec2( -INV_ROOT2, -INV_ROOT2 ) );
+	data[ 15] = ComplexMultiply( data[ 15], vec2( -COS_PIOVER8, COS_3PIOVER8 ) );
+	
+	// FFT on rows
+	FFT4_alt( data[ 0 ], data[ 1 ], data[ 2 ], data[ 3 ] );
+	FFT4_alt( data[ 4 ], data[ 5 ], data[ 6 ], data[ 7 ] );
+	FFT4_alt( data[ 8 ], data[ 9 ], data[ 10], data[ 11] );
+	FFT4_alt( data[ 12], data[ 13], data[ 14], data[ 15] );
+	
+	// Transpose
+	vec2 tmp;
+	
+	tmp = data[ 1 ];
+	data[ 1 ] = data[ 4 ];
+	data[ 4 ] = tmp;
+	
+	tmp = data[ 2 ];
+	data[ 2 ] = data[ 8 ];
+	data[ 8 ] = tmp;
+	
+	tmp = data[ 3 ];
+	data[ 3 ] = data[ 12];
+	data[ 12] = tmp;
+	
+	tmp = data[ 6 ];
+	data[ 6 ] = data[ 9 ];
+	data[ 9 ] = tmp;
+	
+	tmp = data[ 7 ];
+	data[ 7 ] = data[ 13];
+	data[ 13] = tmp;
+	
+	tmp = data[ 11 ];
+	data[ 11 ] = data[ 14 ];
+	data[ 14 ] = tmp;
+}
+
+/*
+ ==========================
+ FFT16_inv
+ ==========================
+ */
+void FFT16_inv( inout vec2 data[ 16 ] ) {
+	// FFT on columns
+	FFT4_inv( data[ 0 ], data[ 4 ], data[ 8 ], data[ 12 ] );
+	FFT4_inv( data[ 1 ], data[ 5 ], data[ 9 ], data[ 13 ] );
+	FFT4_inv( data[ 2 ], data[ 6 ], data[ 10], data[ 14 ] );
+	FFT4_inv( data[ 3 ], data[ 7 ], data[ 11], data[ 15 ] );
+	
+	// Twiddles
+	data[ 5 ] = ComplexMultiply( data[ 5 ], vec2( COS_PIOVER8, COS_3PIOVER8 ) );
+	data[ 6 ] = ComplexMultiply( data[ 6 ], vec2( INV_ROOT2, INV_ROOT2 ) );
+	data[ 7 ] = ComplexMultiply( data[ 7 ], vec2( COS_3PIOVER8, COS_PIOVER8 ) );
+	
+	data[ 9 ] = ComplexMultiply( data[ 9 ], vec2( INV_ROOT2, INV_ROOT2 ) );
+	data[ 10] = vec2( -data[ 10].y, data[ 10].x );
+	data[ 11] = ComplexMultiply( data[ 11], vec2( -INV_ROOT2, INV_ROOT2 ) );
+	
+	data[ 13] = ComplexMultiply( data[ 13], vec2( COS_3PIOVER8, COS_PIOVER8 ) );
+	data[ 14] = ComplexMultiply( data[ 14], vec2( -INV_ROOT2, INV_ROOT2 ) );
+	data[ 15] = ComplexMultiply( data[ 15], vec2( -COS_PIOVER8, -COS_3PIOVER8 ) );
+	
+	// FFT on rows
+	FFT4_inv( data[ 0 ], data[ 1 ], data[ 2 ], data[ 3 ] );
+	FFT4_inv( data[ 4 ], data[ 5 ], data[ 6 ], data[ 7 ] );
+	FFT4_inv( data[ 8 ], data[ 9 ], data[ 10], data[ 11] );
+	FFT4_inv( data[ 12], data[ 13], data[ 14], data[ 15] );
+	
+	// Transpose
+	vec2 tmp;
+	
+	tmp = data[ 1 ];
+	data[ 1 ] = data[ 4 ];
+	data[ 4 ] = tmp;
+	
+	tmp = data[ 2 ];
+	data[ 2 ] = data[ 8 ];
+	data[ 8 ] = tmp;
+	
+	tmp = data[ 3 ];
+	data[ 3 ] = data[ 12];
+	data[ 12] = tmp;
+	
+	tmp = data[ 6 ];
+	data[ 6 ] = data[ 9 ];
+	data[ 9 ] = tmp;
+	
+	tmp = data[ 7 ];
+	data[ 7 ] = data[ 13];
+	data[ 13] = tmp;
+	
+	tmp = data[ 11 ];
+	data[ 11 ] = data[ 14 ];
+	data[ 14 ] = tmp;
+}
+
+/*
+ ==========================
+ FFT32
+ ==========================
+ */
+void FFT32( inout vec2 data[ 32 ] ) {
+	// FFT on columns
+	FFT4_alt( data[ 0 ], data[ 8 ], data[ 16 ], data[ 24 ] );
+	FFT4_alt( data[ 1 ], data[ 9 ], data[ 17 ], data[ 25 ] );
+	FFT4_alt( data[ 2 ], data[ 10], data[ 18 ], data[ 26 ] );
+	FFT4_alt( data[ 3 ], data[ 11], data[ 19 ], data[ 27 ] );
+	
+	FFT4_alt( data[ 4 ], data[ 12], data[ 20 ], data[ 28 ] );
+	FFT4_alt( data[ 5 ], data[ 13], data[ 21 ], data[ 29 ] );
+	FFT4_alt( data[ 6 ], data[ 14], data[ 22 ], data[ 30 ] );
+	FFT4_alt( data[ 7 ], data[ 15], data[ 23 ], data[ 31 ] );
+	
+	// Twiddles
+	data[  9 ] = ComplexMultiply( data[  9 ], vec2( COS_PIOVER16,	-COS_7PIOVER16 ) );
+	data[ 10 ] = ComplexMultiply( data[ 10 ], vec2( COS_PIOVER8,	-COS_3PIOVER8 ) );
+	data[ 11 ] = ComplexMultiply( data[ 11 ], vec2( COS_3PIOVER16,	-COS_5PIOVER16 ) );
+	data[ 12 ] = ComplexMultiply( data[ 12 ], vec2( INV_ROOT2,		-INV_ROOT2 ) );
+	data[ 13 ] = ComplexMultiply( data[ 13 ], vec2( COS_5PIOVER16,	-COS_3PIOVER16 ) );
+	data[ 14 ] = ComplexMultiply( data[ 14 ], vec2( COS_3PIOVER8,	-COS_PIOVER8 ) );
+	data[ 15 ] = ComplexMultiply( data[ 15 ], vec2( COS_7PIOVER16,	-COS_PIOVER16 ) );
+	
+	data[ 17 ] = ComplexMultiply( data[ 17 ], vec2( COS_PIOVER8,	-COS_3PIOVER8 ) );
+	data[ 18 ] = ComplexMultiply( data[ 18 ], vec2( INV_ROOT2,		-INV_ROOT2 ) );
+	data[ 19 ] = ComplexMultiply( data[ 19 ], vec2( COS_3PIOVER8,	-COS_PIOVER8 ) );
+	data[ 20 ] = ComplexMultiply( data[ 20 ], vec2( 0.0, -1.0 ) );
+	data[ 21 ] = ComplexMultiply( data[ 21 ], vec2( -COS_3PIOVER8,	-COS_PIOVER8 ) );
+	data[ 22 ] = ComplexMultiply( data[ 22 ], vec2( -INV_ROOT2,		-INV_ROOT2 ) );
+	data[ 23 ] = ComplexMultiply( data[ 23 ], vec2( -COS_PIOVER8,	-COS_3PIOVER8 ) );
+	
+	data[ 25 ] = ComplexMultiply( data[ 25 ], vec2( COS_3PIOVER16,	-COS_5PIOVER16 ) );
+	data[ 26 ] = ComplexMultiply( data[ 26 ], vec2( COS_3PIOVER8,	-COS_PIOVER8 ) );
+	data[ 27 ] = ComplexMultiply( data[ 27 ], vec2( -COS_7PIOVER16,	-COS_PIOVER16 ) );
+	data[ 28 ] = ComplexMultiply( data[ 28 ], vec2( -INV_ROOT2,		-INV_ROOT2 ) );
+	data[ 29 ] = ComplexMultiply( data[ 29 ], vec2( -COS_PIOVER16,	-COS_7PIOVER16 ) );
+	data[ 30 ] = ComplexMultiply( data[ 30 ], vec2( -COS_PIOVER8,	COS_3PIOVER8 ) );
+	data[ 31 ] = ComplexMultiply( data[ 31 ], vec2( -COS_5PIOVER16,	COS_3PIOVER16 ) );
+	
+	// FFT on rows
+	FFT8_alt( data[ 0 ], data[ 1 ], data[ 2 ], data[ 3 ], data[ 4 ], data[ 5 ], data[ 6 ], data[ 7 ] );
+	FFT8_alt( data[ 8 ], data[ 9 ], data[ 10], data[ 11], data[ 12], data[ 13], data[ 14], data[ 15] );
+	FFT8_alt( data[ 16], data[ 17], data[ 18], data[ 19], data[ 20], data[ 21], data[ 22], data[ 23] );
+	FFT8_alt( data[ 24], data[ 25], data[ 26], data[ 27], data[ 28], data[ 29], data[ 30], data[ 31] );
+	
+	// Transpose
+	vec2 tmp[ 32 ];
+	for ( int i = 0; i < 32; i++ ) {
+		tmp[ i ] = data[ i ];
+	}
+	
+	for ( int x = 0; x < 8; x++ ) {
+		for ( int y = 0; y < 4; y++ ) {
+			data[ y + 4 * x ] = tmp[ x + 8 * y ];
+		}
+	}
+}
+
+/*
+ ==========================
+ FFT32_inv
+ ==========================
+ */
+void FFT32_inv( inout vec2 data[ 32 ] ) {
+	// FFT on columns
+	FFT4_inv( data[ 0 ], data[ 8 ], data[ 16 ], data[ 24 ] );
+	FFT4_inv( data[ 1 ], data[ 9 ], data[ 17 ], data[ 25 ] );
+	FFT4_inv( data[ 2 ], data[ 10], data[ 18 ], data[ 26 ] );
+	FFT4_inv( data[ 3 ], data[ 11], data[ 19 ], data[ 27 ] );
+	
+	FFT4_inv( data[ 4 ], data[ 12], data[ 20 ], data[ 28 ] );
+	FFT4_inv( data[ 5 ], data[ 13], data[ 21 ], data[ 29 ] );
+	FFT4_inv( data[ 6 ], data[ 14], data[ 22 ], data[ 30 ] );
+	FFT4_inv( data[ 7 ], data[ 15], data[ 23 ], data[ 31 ] );
+	
+	// Twiddles
+	data[  9 ] = ComplexMultiply( data[  9 ], vec2( COS_PIOVER16,	COS_7PIOVER16 ) );
+	data[ 10 ] = ComplexMultiply( data[ 10 ], vec2( COS_PIOVER8,	COS_3PIOVER8 ) );
+	data[ 11 ] = ComplexMultiply( data[ 11 ], vec2( COS_3PIOVER16,	COS_5PIOVER16 ) );
+	data[ 12 ] = ComplexMultiply( data[ 12 ], vec2( INV_ROOT2,		INV_ROOT2 ) );
+	data[ 13 ] = ComplexMultiply( data[ 13 ], vec2( COS_5PIOVER16,	COS_3PIOVER16 ) );
+	data[ 14 ] = ComplexMultiply( data[ 14 ], vec2( COS_3PIOVER8,	COS_PIOVER8 ) );
+	data[ 15 ] = ComplexMultiply( data[ 15 ], vec2( COS_7PIOVER16,	COS_PIOVER16 ) );
+	
+	data[ 17 ] = ComplexMultiply( data[ 17 ], vec2( COS_PIOVER8,	COS_3PIOVER8 ) );
+	data[ 18 ] = ComplexMultiply( data[ 18 ], vec2( INV_ROOT2,		INV_ROOT2 ) );
+	data[ 19 ] = ComplexMultiply( data[ 19 ], vec2( COS_3PIOVER8,	COS_PIOVER8 ) );
+	data[ 20 ] = ComplexMultiply( data[ 20 ], vec2( 0.0, 1.0 ) );
+	data[ 21 ] = ComplexMultiply( data[ 21 ], vec2( -COS_3PIOVER8,	COS_PIOVER8 ) );
+	data[ 22 ] = ComplexMultiply( data[ 22 ], vec2( -INV_ROOT2,		INV_ROOT2 ) );
+	data[ 23 ] = ComplexMultiply( data[ 23 ], vec2( -COS_PIOVER8,	COS_3PIOVER8 ) );
+	
+	data[ 25 ] = ComplexMultiply( data[ 25 ], vec2( COS_3PIOVER16,	COS_5PIOVER16 ) );
+	data[ 26 ] = ComplexMultiply( data[ 26 ], vec2( COS_3PIOVER8,	COS_PIOVER8 ) );
+	data[ 27 ] = ComplexMultiply( data[ 27 ], vec2( -COS_7PIOVER16,	COS_PIOVER16 ) );
+	data[ 28 ] = ComplexMultiply( data[ 28 ], vec2( -INV_ROOT2,		INV_ROOT2 ) );
+	data[ 29 ] = ComplexMultiply( data[ 29 ], vec2( -COS_PIOVER16,	COS_7PIOVER16 ) );
+	data[ 30 ] = ComplexMultiply( data[ 30 ], vec2( -COS_PIOVER8,	-COS_3PIOVER8 ) );
+	data[ 31 ] = ComplexMultiply( data[ 31 ], vec2( -COS_5PIOVER16,	-COS_3PIOVER16 ) );
+	
+	// FFT on rows
+	FFT8_inv( data[ 0 ], data[ 1 ], data[ 2 ], data[ 3 ], data[ 4 ], data[ 5 ], data[ 6 ], data[ 7 ] );
+	FFT8_inv( data[ 8 ], data[ 9 ], data[ 10], data[ 11], data[ 12], data[ 13], data[ 14], data[ 15] );
+	FFT8_inv( data[ 16], data[ 17], data[ 18], data[ 19], data[ 20], data[ 21], data[ 22], data[ 23] );
+	FFT8_inv( data[ 24], data[ 25], data[ 26], data[ 27], data[ 28], data[ 29], data[ 30], data[ 31] );	
+	
+	// Transpose
+	vec2 tmp[ 32 ];
+	for ( int i = 0; i < 32; i++ ) {
+		tmp[ i ] = data[ i ];
+	}
+	
+	for ( int x = 0; x < 8; x++ ) {
+		for ( int y = 0; y < 4; y++ ) {
+			data[ y + 4 * x ] = tmp[ x + 8 * y ];
+		}
+	}
+}
+
+
+
+
+
+
+
+
+
+
+
+#define WORK_GROUP_SIZE 64
+layout ( local_size_x = WORK_GROUP_SIZE, local_size_y = 1, local_size_z = 1 ) in;
+
+layout( binding = 0, rg16f ) uniform readonly image2D sourceTex;
+layout ( binding = 1 ) uniform writeonly image2D destTex;
+
+shared vec2 groupData[ 2048 ];
+
+/*
+ ==========================
+ main
+ ==========================
+ */
+void main() {
+	//gl_LocalInvocationID
+	//gl_WorkGroupID
+	
+	int N1 = 32;
+	int N2 = 16;
+	int thread_id = int( gl_GlobalInvocationID.x );
+	
+	int rowOffset = thread_id / N2;
+	int threadID = thread_id % N2;
+	
+	int groupID = ( thread_id % 64 ) / 16;
+	int groupOffset = 512 * groupID;
+	
+	vec2 data32[ 32 ];
+	
+	int n2 = threadID;	// [0,16) range
+	
+	//
+	//	FFT on columns
+	//
+	{
+		for ( int n1 = 0; n1 < N1; n1++ ) {
+			data32[ n1 ] = imageLoad( sourceTex, ivec2( ( n1 * N2 ) + n2, rowOffset ) ).xy;
+		}
+		
+		FFT32( data32 );
+		
+		// store data
+		for ( int n1 = 0; n1 < N1; n1++ ) {
+			groupData[ ( n1 * N2 ) + n2 + groupOffset ] = data32[ n1 ];
+		}
+	}
+	
+	//memoryBarrier();
+	groupMemoryBarrier();
+	
+	//
+	//	FFT on rows
+	//
+	
+	// Swap N1 and N2.  Perform N2 ffts of length N1
+	N1 = 16;
+	N2 = 32;
+	
+	vec2 data16[ 16 ];
+	for ( int i = 0; i < 2; i++ ) {
+		n2 += i * 16;	// now n2 needs to be in the [0,32) range
+		
+		for ( int n1 = 0; n1 < N1; n1++ ) {
+			data16[ n1 ] = groupData[ n1 + ( n2 * N1 ) + groupOffset ];
+		}
+		
+		// Twiddles
+		float angle = -2.0 * PI * float( n2 ) / float( N1 * N2 );
+		for ( int n1 = 1; n1 < N1; n1++ ) {
+			vec2 c = Complex( float( n1 ) * angle );
+			data16[ n1 ] = ComplexMultiply( data16[ n1 ], c );
+		}
+		
+		FFT16( data16 );
+		
+		// store data
+		for ( int n1 = 0; n1 < N1; n1++ ) {
+			imageStore( destTex, ivec2( ( n1 * N2 ) + n2, rowOffset ), vec4( data16[ n1 ].x, data16[ n1 ].y, 0.0, 1.0 ) );
+		}
+	}
+}
+
+
+ 
+ 
