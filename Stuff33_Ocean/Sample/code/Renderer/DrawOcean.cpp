@@ -55,6 +55,9 @@ Descriptors		g_oceanDescriptorsNormals;
 Pipeline		g_oceanPipelineDraw;
 Descriptors		g_oceanDescriptorsDraw;
 
+Pipeline		g_oceanPipelineDrawDeferred;
+Descriptors		g_oceanDescriptorsDrawDeferred;
+
 Image			g_oceanImageH0[ 4 ];
 Image			g_oceanImageHT[ 4 ];
 Image			g_oceanFFTA[ 4 ];
@@ -632,6 +635,46 @@ bool InitOceanSimulation( DeviceContext * device ) {
 	}
 
 	//
+	//	Ocean Draw Deferred
+	//
+	{
+		Descriptors::CreateParms_t descriptorParms;
+		memset( &descriptorParms, 0, sizeof( descriptorParms ) );
+		descriptorParms.type = Descriptors::TYPE_GRAPHICS;
+		descriptorParms.numUniformsVertex = 2;
+		descriptorParms.numStorageImagesVertex = 4;
+		descriptorParms.numUniformsFragment = 1;
+		descriptorParms.numSamplerImagesFragment = 4;
+		result = g_oceanDescriptorsDrawDeferred.Create( device, descriptorParms );
+		if ( !result ) {
+			printf( "Unable to build compute descriptors!\n" );
+			assert( 0 );
+			return false;
+		}
+
+		Pipeline::CreateParms_t pipelineParms;
+		memset( &pipelineParms, 0, sizeof( pipelineParms ) );
+		pipelineParms.framebuffer = NULL;//&g_offscreenFrameBuffer;
+		pipelineParms.renderPass = g_gbuffer.m_vkRenderPass;
+		pipelineParms.descriptors = &g_oceanDescriptorsDrawDeferred;
+		pipelineParms.shader = g_shaderManager->GetShader( "Ocean/DrawDeferred" );
+		pipelineParms.width = g_gbuffer.m_parms.width;
+		pipelineParms.height = g_gbuffer.m_parms.height;
+		//pipelineParms.cullMode = Pipeline::CULL_MODE_FRONT;
+		pipelineParms.cullMode = Pipeline::CULL_MODE_NONE;
+//		pipelineParms.fillMode = Pipeline::FILL_MODE_FILL;
+		pipelineParms.depthTest = true;
+		pipelineParms.depthWrite = true;
+		pipelineParms.numColorAttachments = GFrameBuffer::s_numColorImages;
+		result = g_oceanPipelineDrawDeferred.Create( device, pipelineParms ); 
+		if ( !result ) {
+			printf( "Unable to build compute pipeline!\n" );
+			assert( 0 );
+			return false;
+		}
+	}
+
+	//
 	//	Build the ocean screen space grid
 	//
 	{
@@ -780,6 +823,9 @@ bool CleanupOceanSimulation( DeviceContext * device ) {
 	g_oceanPipelineDraw.Cleanup( device );
 	g_oceanDescriptorsDraw.Cleanup( device );
 
+	g_oceanPipelineDrawDeferred.Cleanup( device );
+	g_oceanDescriptorsDrawDeferred.Cleanup( device );
+
 	return true;
 }
 
@@ -912,18 +958,26 @@ bool IntersectOceanPlaneViewFrustum( const Mat4 & matView, const Mat4 & matProj,
 		Vec3 pt2d = Vec3( screenSpacePts[ i ].x, screenSpacePts[ i ].y, 0.0f );
 		bounds.Expand( pt2d );
 	}
-// 	if ( bounds.mins.x <= -0.99f ) {
-// 		bounds.mins.x = -1.2f;
-// 		bounds.mins.x = -1.0f;
-// 	}
-// 	if ( bounds.mins.y <= -0.99f ) {
-// 		bounds.mins.y = -1.2f;
-// 		bounds.mins.y = -1.0f;
-// 	}
-// 	if ( bounds.maxs.x >= 0.99f ) {
-// 		bounds.maxs.x = 1.2f;
-// 		bounds.maxs.x = 1.0f;
-// 	}
+
+	// If the grid reaches to the edge of the sreen, then expand it
+	const float limitX = 1.2f;
+	const float limitY = 1.4f;
+	if ( bounds.mins.x <= -0.99f ) {
+		bounds.mins.x = -limitX;
+		//bounds.mins.x = -1.0f;
+	}
+	if ( bounds.mins.y <= -0.99f ) {
+		bounds.mins.y = -limitY;
+		//bounds.mins.y = -1.0f;
+	}
+	if ( bounds.maxs.x >= 0.99f ) {
+		bounds.maxs.x = limitX;
+		//bounds.maxs.x = 1.0f;
+	}
+	if ( bounds.maxs.y >= 0.99f ) {
+		bounds.maxs.y = limitY;
+		//bounds.maxs.y = 1.0f;
+	}
 
 	// Calculate the bias matrix: (we might need to transpose it)
 	matBias.Identity();
@@ -972,7 +1026,7 @@ void UpdateOceanParms( DeviceContext * device, float dt_sec, Mat4 matView, Mat4 
 	Vec2 yScaleOffset;
 	Mat4 tmpProjector;
 	//float oceanPlane = -75.0f;
-	float oceanPlane = -10;
+	float oceanPlane = -30;
 	g_oceanDoesIntersectCamera = IntersectOceanPlaneViewFrustum( matView, matProj, oceanPlane, tmpProjector, matBias, tmp, yScaleOffset );
 	if ( !g_oceanDoesIntersectCamera ) {
 		return;
@@ -1295,6 +1349,66 @@ void DrawOcean( DrawParms_t & parms ) {
 		descriptor.BindImage( g_oceanNormals[ 3 ], Samplers::m_samplerRepeat, 10 );
 
 		descriptor.BindDescriptor( device, cmdBuffer, &g_oceanPipelineDraw );
+
+		g_oceanGridModel.DrawIndexed( cmdBuffer );
+	}
+}
+
+
+/*
+====================================================
+DrawOceanDeferred
+====================================================
+*/
+void DrawOceanDeferred( DrawParms_t & parms ) {
+	if ( !g_oceanDoesIntersectCamera ) {
+		return;
+	}
+
+	DeviceContext * device = parms.device;
+	int cmdBufferIndex = parms.cmdBufferIndex;
+	Buffer * uniforms = parms.uniforms;
+	const RenderModel * renderModels = parms.renderModels;
+	const int numModels = parms.numModels;
+	VkCommandBuffer cmdBuffer = device->m_vkCommandBuffers[ cmdBufferIndex ];
+
+	//
+	//	Now Draw the Ocean!
+	//
+	{
+		const int camOffset = 0;
+		const int camSize = sizeof( float ) * 16 * 4;
+
+// 		const int shadowCamOffset = camOffset + camSize;
+// 		const int shadowCamSize = camSize;
+
+		const int uboVertOffset = device->GetAlignedUniformByteOffset( sizeof( oceanUniformParms_t ) ) * 4;
+		const int uboVertSize = sizeof( oceanDrawVertParms_t );
+
+		const int uboFragOffset = device->GetAlignedUniformByteOffset( uboVertOffset + uboVertSize );
+		const int uboFragSize = sizeof( oceanDrawFragParms_t );
+
+		// Binding the pipeline is effectively the "use shader" we had back in our opengl apps
+		g_oceanPipelineDrawDeferred.BindPipeline( cmdBuffer );
+
+		// Descriptor is how we bind our buffers and images
+		Descriptor descriptor = g_oceanPipelineDrawDeferred.GetFreeDescriptor();
+ 		descriptor.BindBuffer( uniforms, camOffset, camSize, 0 );
+ 		descriptor.BindBuffer( &g_oceanUniformBuffer, uboVertOffset, uboVertSize, 1 );
+
+		descriptor.BindStorageImage( g_oceanHeights[ 0 ], Samplers::m_samplerStandard, 2 );
+		descriptor.BindStorageImage( g_oceanHeights[ 1 ], Samplers::m_samplerStandard, 3 );
+		descriptor.BindStorageImage( g_oceanHeights[ 2 ], Samplers::m_samplerStandard, 4 );
+		descriptor.BindStorageImage( g_oceanHeights[ 3 ], Samplers::m_samplerStandard, 5 );
+
+		descriptor.BindBuffer( &g_oceanUniformBuffer, uboFragOffset, uboFragSize, 6 );
+
+		descriptor.BindImage( g_oceanNormals[ 0 ], Samplers::m_samplerRepeat, 7 );
+		descriptor.BindImage( g_oceanNormals[ 1 ], Samplers::m_samplerRepeat, 8 );
+		descriptor.BindImage( g_oceanNormals[ 2 ], Samplers::m_samplerRepeat, 9 );
+		descriptor.BindImage( g_oceanNormals[ 3 ], Samplers::m_samplerRepeat, 10 );
+
+		descriptor.BindDescriptor( device, cmdBuffer, &g_oceanPipelineDrawDeferred );
 
 		g_oceanGridModel.DrawIndexed( cmdBuffer );
 	}

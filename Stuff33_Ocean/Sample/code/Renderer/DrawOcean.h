@@ -16,3 +16,4 @@ bool CleanupOceanSimulation( DeviceContext * device );
 void UpdateOceanParms( DeviceContext * device, float dt_sec, Mat4 matView, Mat4 matProj, Vec3 camPos, Vec3 camLookAt );
 void UpdateOceanSimulation( DrawParms_t & parms );
 void DrawOcean( DrawParms_t & parms );
+void DrawOceanDeferred( DrawParms_t & parms );
