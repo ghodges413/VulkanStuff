@@ -65,7 +65,7 @@ extern GFrameBuffer g_gbuffer;
 InitLightTiles
 ====================================================
 */
-bool InitLightTiles( DeviceContext * device, int width, int height ) {
+bool InitLightTiles( DeviceContext * device, int width, int height, brush_t * brushes, int numBrushes ) {
 	bool result = false;
 
 	int numGroupsX = ( width + g_threadWdith - 1 ) / g_threadWdith;
@@ -114,6 +114,19 @@ bool InitLightTiles( DeviceContext * device, int width, int height ) {
 	//
 	//	Initialize some random lights
 	//
+	Bounds bounds;
+	bounds.Clear();
+	for ( int i = 0; i < numBrushes; i++ ) {
+		const brush_t & brush = brushes[ i ];
+
+		for ( int j = 0; j < brush.numPlanes; j++ ) {
+			const winding_t & winding = brush.windings[ j ];
+
+			for ( int k = 0; k < winding.pts.size(); k++ ) {
+				bounds.Expand( winding.pts[ k ] );
+			}
+		}
+	}
 
 	const int maxLights = g_numBaseLights;//( numLights < g_maxWorldLights ) ? numLights : g_maxWorldLights;
 
@@ -131,10 +144,48 @@ bool InitLightTiles( DeviceContext * device, int width, int height ) {
 			light.m_color = Vec4( 0, 0, 1, 1 );
 		}
 
-		light.m_sphere.x = 2.0f * ( Random::Get() - 0.5f ) * 50.0f;
-		light.m_sphere.y = 2.0f * ( Random::Get() - 0.5f ) * 50.0f;
-		light.m_sphere.z = Random::Get() * 10.0f;// + 1.0f;
+		Vec3 pos;
+		bool isInBrush = false;
+		do {
+			pos.x = bounds.mins.x + Random::Get() * bounds.WidthX();
+			pos.y = bounds.mins.y + Random::Get() * bounds.WidthY();
+			pos.z = bounds.mins.z + Random::Get() * bounds.WidthZ();
+
+			isInBrush = false;
+			for ( int j = 0; j < numBrushes; j++ ) {
+				const brush_t & brush = brushes[ j ];
+				isInBrush = IsPointInBrush( brush, pos );
+				isInBrush = isInBrush || IsPointInBrush( brush, pos + Vec3( 1, 0, 0 ) );
+				isInBrush = isInBrush || IsPointInBrush( brush, pos + Vec3(-1, 0, 0 ) );
+				isInBrush = isInBrush || IsPointInBrush( brush, pos + Vec3( 0, 1, 0 ) );
+				isInBrush = isInBrush || IsPointInBrush( brush, pos + Vec3( 0,-1, 0 ) );
+				isInBrush = isInBrush || IsPointInBrush( brush, pos + Vec3( 0, 0, 1 ) );
+				isInBrush = isInBrush || IsPointInBrush( brush, pos + Vec3( 0, 0,-1 ) );
+
+				isInBrush = isInBrush || IsPointInBrush( brush, pos + Vec3( 1, 1, 1 ) );
+				isInBrush = isInBrush || IsPointInBrush( brush, pos + Vec3( 1, 1,-1 ) );
+				isInBrush = isInBrush || IsPointInBrush( brush, pos + Vec3( 1,-1, 1 ) );
+				isInBrush = isInBrush || IsPointInBrush( brush, pos + Vec3( 1,-1,-1 ) );
+
+				isInBrush = isInBrush || IsPointInBrush( brush, pos + Vec3(-1, 1, 1 ) );
+				isInBrush = isInBrush || IsPointInBrush( brush, pos + Vec3(-1, 1,-1 ) );
+				isInBrush = isInBrush || IsPointInBrush( brush, pos + Vec3(-1,-1, 1 ) );
+				isInBrush = isInBrush || IsPointInBrush( brush, pos + Vec3(-1,-1,-1 ) );
+				if ( isInBrush ) {
+					break;
+				}
+			}
+		} while ( isInBrush );
+
+		light.m_sphere.x = pos.x;
+		light.m_sphere.y = pos.y;
+		light.m_sphere.z = pos.z;
 		light.m_sphere.w = 10.0f;
+
+// 		light.m_sphere.x = 2.0f * ( Random::Get() - 0.5f ) * 50.0f;
+// 		light.m_sphere.y = 2.0f * ( Random::Get() - 0.5f ) * 50.0f;
+// 		light.m_sphere.z = Random::Get() * 10.0f;// + 1.0f;
+// 		light.m_sphere.w = 10.0f;
 	}
 	g_lightsStorageBuffer.UnmapBuffer( device );
 

@@ -160,6 +160,11 @@ void Application::Initialize() {
 			}
 		}
 	}
+
+	int windowWidth;
+	int windowHeight;
+	glfwGetWindowSize( m_glfwWindow, &windowWidth, &windowHeight );
+	InitLightTiles( &m_device, windowWidth, windowHeight, g_brushes.data(), g_brushes.size() );
 }
 
 /*
@@ -402,7 +407,7 @@ bool Application::InitializeVulkan() {
 	InitOffscreen( &m_device, windowWidth, windowHeight );
 	InitDepthPrePass( &m_device );	
 	InitGBuffer( &m_device, windowWidth, windowHeight );
-	InitLightTiles( &m_device, windowWidth, windowHeight );
+	//InitLightTiles( &m_device, windowWidth, windowHeight );
 	InitDebugDrawLightTiles( &m_device, windowWidth, windowHeight );
 	InitDrawTiledGGX( &m_device, windowWidth, windowHeight );
 	InitSkybox( &m_device, windowWidth, windowHeight );

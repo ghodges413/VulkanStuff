@@ -6,6 +6,7 @@
 #include "Renderer/Common.h"
 #include "Graphics/DeviceContext.h"
 #include "Math/Matrix.h"
+#include "BSP/Brush.h"
 
 class Buffer;
 struct RenderModel;
@@ -25,7 +26,7 @@ struct buildLightTileParms_t {
 	int pad0;
 };
 
-bool InitLightTiles( DeviceContext * device, int width, int height );
+bool InitLightTiles( DeviceContext * device, int width, int height, brush_t * brushes, int numBrushes );
 void CleanupLightTiles( DeviceContext * device );
 
 void UpdateLights( DeviceContext * device, const storageLight_t * lights, int numLights, const buildLightTileParms_t & buildParms );

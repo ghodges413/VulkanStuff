@@ -25,7 +25,7 @@
 #include "Graphics/Targa.h"
 #include "Scenes/Scene.h"
 
-//#define GEN_LIGHTPROBE
+#define GEN_LIGHTPROBE
 //#define GEN_AMBIENT
 
 /*
