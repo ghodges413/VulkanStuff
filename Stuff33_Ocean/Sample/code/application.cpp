@@ -891,6 +891,7 @@ void Application::DrawFrame() {
 	parms.camera = g_camera;
 
 	UpdateOceanSimulation( parms );
+	UpdateSunShadowDescriptors( parms );	
 
 	// Update the shadows
 	UpdateShadows( parms );
@@ -921,7 +922,7 @@ void Application::DrawFrame() {
 
 	//
 	//	Draw to Offscreen Buffer
-	//	
+	//
 	UpdateShadowDescriptors( parms );
 	g_offscreenFrameBuffer.m_imageColor.TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL );
 	g_offscreenFrameBuffer.m_imageDepth.TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL );

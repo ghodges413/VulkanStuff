@@ -14,5 +14,6 @@ struct RenderModel;
 bool InitAtmosphere( DeviceContext * device, int width, int height );
 bool CleanupAtmosphere( DeviceContext * device );
 void UpdateAtmosphere( DeviceContext * device, const Camera_t & camera, float dt_sec, Bounds mapBounds );
+void UpdateSunShadowDescriptors( DrawParms_t & parms );
 void UpdateSunShadow( DrawParms_t & parms );
 void DrawAtmosphere( DrawParms_t & parms );

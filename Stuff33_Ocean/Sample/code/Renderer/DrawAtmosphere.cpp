@@ -35,11 +35,13 @@ Image g_irradianceImage;
 Image g_scatterimage;
 
 struct atmosUniforms_t {
+	shadowCamera_t shadowCamera;
+
 	Vec4 camera;
 	Vec3 sun;
 	float ISun;// = 10.0;
 
-	shadowCamera_t shadowCamera;
+	
 
 	Vec4 dimInScatter;// = vec4( 32, 128, 32, 8 );
 
@@ -95,8 +97,8 @@ bool InitAtmosphere( DeviceContext * device, int width, int height ) {
 
 	// Fill out the g_atmosData structure
 	g_atmosData.camera = Vec4( 0.0f );
-	g_atmosData.sun = Vec3( cosf( g_sunAngle ), 0.0f, sinf( g_sunAngle ) );
-	//g_atmosData.sun = Vec3( cosf( g_sunAngle ), 1.0f, sinf( g_sunAngle ) );
+	//g_atmosData.sun = Vec3( cosf( g_sunAngle ), 0.0f, sinf( g_sunAngle ) );
+	g_atmosData.sun = Vec3( cosf( g_sunAngle ), 1.0f, sinf( g_sunAngle ) );
 	g_atmosData.sun.Normalize();
 	g_atmosData.ISun = 10;
 	g_atmosData.shadowCamera.matProj.Identity();
@@ -287,8 +289,8 @@ void UpdateAtmosphere( DeviceContext * device, const Camera_t & camera, float dt
 			g_atmosData.ISun = 0.0f;
 		}
 	}
-	g_atmosData.sun = Vec3( cosf( g_sunAngle ), 0.0f, sinf( g_sunAngle ) );
-	//g_atmosData.sun = Vec3( cosf( g_sunAngle ), 1.0f, sinf( g_sunAngle ) );
+	//g_atmosData.sun = Vec3( cosf( g_sunAngle ), 0.0f, sinf( g_sunAngle ) );
+	g_atmosData.sun = Vec3( cosf( g_sunAngle ), 1.0f, sinf( g_sunAngle ) );
 	g_atmosData.sun.Normalize();
 
 	// Update the shadow matrices
@@ -309,6 +311,44 @@ void UpdateAtmosphere( DeviceContext * device, const Camera_t & camera, float dt
 	g_atmosUniforms.UnmapBuffer( device );
 }
 
+static std::vector< Descriptor > g_descriptorList;
+
+/*
+====================================================
+UpdateSunShadowDescriptors
+====================================================
+*/
+void UpdateSunShadowDescriptors( DrawParms_t & parms ) {
+	DeviceContext * device = parms.device;
+	int cmdBufferIndex = parms.cmdBufferIndex;
+	Buffer * uniforms = parms.uniforms;
+	const RenderModel * renderModels = parms.notCulledRenderModels;
+	const int numModels = parms.numNotCulledRenderModels;
+	VkCommandBuffer cmdBuffer = device->m_vkCommandBuffers[ cmdBufferIndex ];
+
+	if ( g_descriptorList.size() == 0 ) {
+		g_descriptorList.reserve( numModels );
+
+		int camOffset = 0;
+		int camSize = sizeof( shadowCamera_t );
+
+		for ( int i = 0; i < numModels; i++ ) {
+			const RenderModel & renderModel = renderModels[ i ];
+			if ( NULL == renderModel.modelDraw ) {
+				continue;
+			}
+
+			// Descriptor is how we bind our buffers and images
+			Descriptor descriptor = g_sunShadowUpdatePipeline.GetFreeDescriptor();
+			descriptor.BindBuffer( &g_atmosUniforms, camOffset, camSize, 0 );							// bind the camera matrices
+			descriptor.BindBuffer( uniforms, renderModel.uboByteOffset, renderModel.uboByteSize, 1 );	// bind the model matrices
+			
+			descriptor.UpdateDescriptor( device );
+			g_descriptorList.push_back( descriptor );
+		}
+	}
+}
+
 /*
 ====================================================
 UpdateSunShadow
@@ -326,33 +366,10 @@ void UpdateSunShadow( DrawParms_t & parms ) {
 	const int numModels = parms.numNotCulledRenderModels;
 	VkCommandBuffer cmdBuffer = device->m_vkCommandBuffers[ cmdBufferIndex ];
 
-	std::vector< Descriptor > descriptorList;
-	descriptorList.reserve( numModels );
-
 	//
 	//	Draw the models
 	//
 	{
-		descriptorList.clear();
-
-		int camOffset = sizeof( Vec4 ) * 2;
-		int camSize = sizeof( shadowCamera_t );
-
-		for ( int i = 0; i < numModels; i++ ) {
-			const RenderModel & renderModel = renderModels[ i ];
-			if ( NULL == renderModel.modelDraw ) {
-				continue;
-			}
-
-			// Descriptor is how we bind our buffers and images
-			Descriptor descriptor = g_sunShadowUpdatePipeline.GetFreeDescriptor();
-			descriptor.BindBuffer( &g_atmosUniforms, camOffset, camSize, 0 );							// bind the camera matrices
-			descriptor.BindBuffer( uniforms, renderModel.uboByteOffset, renderModel.uboByteSize, 1 );	// bind the model matrices
-			
-			descriptor.UpdateDescriptor( device );
-			descriptorList.push_back( descriptor );
-		}
-
 		g_sunShadowFrameBuffer.m_imageDepth.TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL );
 		g_sunShadowFrameBuffer.BeginRenderPass( device, cmdBufferIndex, true, true );
 
@@ -365,7 +382,7 @@ void UpdateSunShadow( DrawParms_t & parms ) {
 				continue;
 			}
 
-			descriptorList[ idx ].BindDescriptor( cmdBuffer, &g_sunShadowUpdatePipeline );
+			g_descriptorList[ idx ].BindDescriptor( cmdBuffer, &g_sunShadowUpdatePipeline );
 			renderModel.modelDraw->DrawIndexed( cmdBuffer );
 			idx++;
 		}

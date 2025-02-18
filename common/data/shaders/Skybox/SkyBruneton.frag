@@ -6,11 +6,13 @@ Uniforms
 ==========================================
 */
 layout( binding = 1 ) uniform uboSky {
+    mat4 shadowView;
+    mat4 shadowProj;
+    
     vec4 camera;
     vec4 sun;   // xyz = dir, w = intensity
     // float sunIntensity; // packed into above w component
-    mat4 shadowView;
-    mat4 shadowProj;
+    
 
     vec4 dimScatter;// = vec4( 32, 128, 32, 8 );
 
