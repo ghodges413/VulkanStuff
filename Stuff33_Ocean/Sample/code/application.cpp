@@ -203,6 +203,11 @@ void Application::Initialize() {
 	entity.pos = Vec3( -16, 0, 2.0f );
 	entity.isTransparent = false;
 	m_entities.push_back( entity );
+
+	int windowWidth;
+	int windowHeight;
+	glfwGetWindowSize( m_glfwWindow, &windowWidth, &windowHeight );
+	InitLightTiles( &m_device, windowWidth, windowHeight, g_brushes.data(), g_brushes.size() );
 }
 
 /*
@@ -334,7 +339,7 @@ bool Application::InitializeVulkan() {
 	InitOffscreen( &m_device, windowWidth, windowHeight );
 	InitDepthPrePass( &m_device );	
 	InitGBuffer( &m_device, windowWidth, windowHeight );
-	InitLightTiles( &m_device, windowWidth, windowHeight );
+//	InitLightTiles( &m_device, windowWidth, windowHeight, g_brushes.data(), g_brushes.size() );
 	InitDebugDrawLightTiles( &m_device, windowWidth, windowHeight );
 	InitDrawTiledGGX( &m_device, windowWidth, windowHeight );
 	InitSkybox( &m_device, windowWidth, windowHeight );
@@ -672,6 +677,13 @@ void Application::UpdateUniforms() {
 // 			camPos = Vec3( -4.52500010, -4.73808956, 1.99951208 );
 // 			camLookAt = Vec3( -3.87189722, -3.98253512, 1.94858062 );
 
+			// top of stairs
+// 			camPos = Vec3( 14.6427755, -1.23668635, 4.00399971 );
+// 			camLookAt = Vec3( 13.6438780, -1.22828746, 3.95781255 );
+
+			// skull position
+// 			camPos = Vec3( -14.7821207, 0.0609404333, 2.00399995 );
+// 			camLookAt = Vec3( -15.7800989, -0.00261096284, 2.00404620 );
 
 			Vec3 left = Vec3( 0, 0, 1 ).Cross( lookDir );
 			lookDir.z = 0.0f;
@@ -895,6 +907,8 @@ void Application::DrawFrame() {
 
 	DrawGBuffer( parms );
 
+	DrawOceanDeferred( parms );
+
 	DrawDecals( parms );
 
 	g_gbuffer.EndRenderPass( parms.device, parms.cmdBufferIndex );
@@ -919,7 +933,7 @@ void Application::DrawFrame() {
 
 //	DrawSkybox( parms );
 	DrawAtmosphere( parms );
-	DrawOcean( parms );
+//	DrawOcean( parms );
 
 #if !defined( GEN_AMBIENT )
 #if defined( USE_SSAO_MULTIPLY )
@@ -972,6 +986,8 @@ void Application::DrawFrame() {
 		extern FrameBuffer * g_taaFrameBufferPtr;
 		extern FrameBuffer * g_taaVelocityBufferPtr;
 		descriptor.BindImage( g_taaFrameBufferPtr->m_imageColor, Samplers::m_samplerStandard, 0 );
+
+//		descriptor.BindImage( g_gbuffer.m_imageColor[ 0 ], Samplers::m_samplerStandard, 0 );
 
 // 		extern FrameBuffer		g_sunShadowFrameBuffer;
 // 		descriptor.BindImage( g_sunShadowFrameBuffer.m_imageDepth, Samplers::m_samplerStandard, 0 );
