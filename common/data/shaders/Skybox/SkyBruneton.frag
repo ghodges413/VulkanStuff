@@ -380,7 +380,8 @@ vec3 GroundColorGeo( vec3 x, vec3 v, vec3 s, float r, float mu, vec3 normal, flo
 	vec3 groundColor = ( max( muS2, 0.0 ) * sunLight + groundSkyLight ) * sunIntensity / pi;
 
 	// TODO: attenuation of light to the viewer, T(x,x0)
-	vec3 attenuation = vec3( 1.0, 1.0, 1.0 );//Transmittance( r, mu, v, x0 );
+	vec3 attenuation = vec3( 1.0, 1.0, 1.0 );
+    //vec3 attenuation = Transmittance( r, mu, v, x0 );
 
 	vec3 result = attenuation * groundColor; //=R[L0]+R[L*]
 	
@@ -447,10 +448,10 @@ void LightGroundGeometry( in vec3 worldPos, in vec3 normal, in vec3 albedo ) {
     float invDelta = 1.0 / delta;
     float bias = 0.04;
 
-    float shadowFactor = 0.0;
+    float shadowFactor = 0.0; // set to shadowed
     if ( depth - shadowPos.z > bias * invDelta ) {
         shadowFactor = 0.2; // not in shadow
-    }    
+    }
 
     // Sample the shadow using offsets to smooth out jaggies
     vec2 shadowOffsets[ 4 ];
@@ -478,13 +479,29 @@ void LightGroundGeometry( in vec3 worldPos, in vec3 normal, in vec3 albedo ) {
             shadowFactor += 0.2;
         }
     }
+
+    // If the shadow sampling is outside the clip space of the shadow,
+    // then don't bother to shadow the fragment
+    if ( shadowST.x < 0.0 || shadowST.x > 1.0 ) {
+        shadowFactor = 1.0;
+    }
+    if ( shadowST.y < 0.0 || shadowST.y > 1.0 ) {
+        shadowFactor = 1.0;
+    }
+
+    // If the shadow map depth is at the far distance, then
+    // the fragment is not in shadow
+    if ( depth >= 1.0 ) {
+        shadowFactor = 1.0;
+    }
 	
     //
     //  Get the ground color
     //
-	vec3 groundColor = GroundColorGeo( x, v, s, r, mu, normal.xyz, shadowFactor ); //R[L0]+R[L*]
-	
-	outColor.rgb = groundColor;
+    //shadowFactor = 1.0;   // HACK used to force the shadow off
+    vec3 normal2 = normal.xyz;
+	vec3 groundColor = GroundColorGeo( x, v, s, r, mu, normal2, shadowFactor ); //R[L0]+R[L*]
+    outColor.rgb = groundColor;
 	outColor.rgb *= albedo.rgb;
 }
 
@@ -519,4 +536,5 @@ void main() {
 		outColor = vec4( sunColor + groundColor + inscatterColor, 1.0 ); // Eq (16)
 	}
     outColor.a = 1.0;
+    outColor.a = 0.0;
 }
