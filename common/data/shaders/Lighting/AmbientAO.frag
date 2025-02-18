@@ -265,6 +265,24 @@ vec3 ColorFromSH( vec3 dir, in vec3 ylm00, in vec3 ylm11, in vec3 ylm10, in vec3
 
 /*
 ==========================================
+IsInClipSpace
+==========================================
+*/
+bool IsInClipSpace( vec3 uvw ) {
+    if ( uvw.x < 0.0 || uvw.x > 1.0 ) {
+        return false;
+    }
+    if ( uvw.y < 0.0 || uvw.y > 1.0 ) {
+        return false;
+    }
+    if ( uvw.z < 0.0 || uvw.z > 1.0 ) {
+        return false;
+    }
+    return true;
+}
+
+/*
+==========================================
 main
 ==========================================
 */
@@ -295,6 +313,13 @@ void main() {
     vec4 green = texture( texAmbientGreen, uvw );
     vec4 blue = texture( texAmbientBlue, uvw );
 
+    // Anything outside the ambient space does not use the ambient nodes
+    if ( !IsInClipSpace( uvw ) ) {
+        red = vec4( 0 );
+        green = vec4( 0 );
+        blue = vec4( 0 );
+    }
+
     // Convert to spherical harmonic components
     vec3 ylm00 = vec3( red.x, green.x, blue.x );
     vec3 ylm11 = vec3( red.y, green.y, blue.y );
@@ -303,6 +328,7 @@ void main() {
 
     vec3 ambientColor = ColorFromSH( normal, ylm00, ylm11, ylm10, ylm1n1 );
     float occlusion = CalculateOcclusion();
+    //occlusion = 1.0;
 
     outColor.rgb = ambientColor * diffuse * occlusion;
     outColor.a = 1.0;
