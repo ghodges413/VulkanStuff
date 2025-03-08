@@ -1,0 +1,240 @@
+#version 450
+
+
+#define WORK_GROUP_SIZE 8
+layout ( local_size_x = WORK_GROUP_SIZE, local_size_y = WORK_GROUP_SIZE, local_size_z = 1 ) in;
+
+//layout( binding = 0, rg32f ) uniform readonly image2D sourceTex;
+//layout ( binding = 1 ) uniform writeonly image2D destTex;
+/*
+layout( binding = 0, set = 0, rgba16f ) uniform writeonly image2D imageDest;
+layout( binding = 1, set = 0, rgba16f ) uniform readonly image2D imageSource;
+layout( binding = 2, set = 0, rgba32f ) uniform readonly image2D imageGBuffer0;
+layout( binding = 3, set = 0, rgba16f ) uniform readonly image2D imageGBuffer1;
+layout( binding = 4, set = 0, rgba16f ) uniform readonly image2D imageGBuffer2;
+*/
+layout( binding = 0 ) uniform writeonly image2D imageDest;
+
+layout( binding = 1, rgba16f ) uniform readonly image2D imageSource;
+layout( binding = 2, rgba32f ) uniform readonly image2D imageGBuffer0;
+layout( binding = 3, rgba16f ) uniform readonly image2D imageGBuffer1;
+layout( binding = 4, rgba16f ) uniform readonly image2D imageGBuffer2;
+
+layout( binding = 5, rgba16f ) uniform readonly image2D imageHistory;
+layout( binding = 6, r32ui ) uniform uimage2D imageHistoryCounter;	// read write history counter
+
+layout( binding = 7, rgba32f ) uniform readonly image2D imageGBufferHistory0;
+layout( binding = 8, rgba16f ) uniform readonly image2D imageGBufferHistory1;
+layout( binding = 9, rgba16f ) uniform readonly image2D imageGBufferHistory2;
+
+layout( binding = 10, rgba16f ) uniform readonly image2D imageVelocity;
+
+layout( binding = 11, rgba16f ) uniform image2D imageLuma;
+layout( binding = 12, rgba16f ) uniform readonly image2D imageLumaHistory;
+
+//shared vec2 groupData[ 256 ];
+
+bool IsCoplanar( vec3 pos, vec3 normal, vec3 historyPos ) {
+	vec3 ab = historyPos - pos;
+	float dist = dot( normal, ab );
+	if ( abs( dist ) < 0.01 ) {
+		return true;
+	}
+	return false;
+}
+
+bool IsNormalSimilar( vec3 normal, vec3 historyNormal ) {
+	float dotdot = max( dot( normal, historyNormal ), 0.0 );
+
+	if ( dotdot * dotdot > 0.95 ) {
+		return true;
+	}
+
+	return false;
+}
+
+float Luminance( vec3 color ) {
+	return dot( vec3( 0.2126, 0.7152, 0.0722 ), color );
+}
+
+/*
+ ==========================
+ SampleHistory
+ ==========================
+ */
+bool SampleHistory( in uint modelID, in vec3 worldPos, in vec3 worldNormal, in vec3 srcColor, out vec3 dstColor, out float varianceSqr, out uint numHistory, out vec4 dstLuma ) {
+	dstColor = srcColor;
+	varianceSqr = 0;
+
+	ivec2 sti = ivec2( gl_GlobalInvocationID.xy );
+    vec4 velocity = imageLoad( imageVelocity, sti );
+	velocity.xy *= vec2( 1920, 1080 );
+	//velocity.xy += vec2( sti.x, sti.y );
+
+	// Sample the 2x2 pixel block and blend between them
+	sti += ivec2( velocity.xy );
+
+	vec3 positions[ 4 ];
+	vec3 normals[ 4 ];
+	vec3 colors[ 4 ];
+	float weights[ 4 ];
+	uint modelIDs[ 4 ];
+	vec4 lumas[ 4 ];
+
+	positions[ 0 ] = imageLoad( imageGBuffer0, sti + ivec2( 0, 0 ) ).xyz;
+	positions[ 1 ] = imageLoad( imageGBuffer0, sti + ivec2( 1, 0 ) ).xyz;
+	positions[ 2 ] = imageLoad( imageGBuffer0, sti + ivec2( 1, 1 ) ).xyz;
+	positions[ 3 ] = imageLoad( imageGBuffer0, sti + ivec2( 0, 1 ) ).xyz;
+
+	normals[ 0 ] = imageLoad( imageGBuffer2, sti + ivec2( 0, 0 ) ).xyz;
+	normals[ 1 ] = imageLoad( imageGBuffer2, sti + ivec2( 1, 0 ) ).xyz;
+	normals[ 2 ] = imageLoad( imageGBuffer2, sti + ivec2( 1, 1 ) ).xyz;
+	normals[ 3 ] = imageLoad( imageGBuffer2, sti + ivec2( 0, 1 ) ).xyz;
+
+	modelIDs[ 0 ] = uint( imageLoad( imageGBuffer2, sti + ivec2( 0, 0 ) ).a );
+	modelIDs[ 1 ] = uint( imageLoad( imageGBuffer2, sti + ivec2( 1, 0 ) ).a );
+	modelIDs[ 2 ] = uint( imageLoad( imageGBuffer2, sti + ivec2( 1, 1 ) ).a );
+	modelIDs[ 3 ] = uint( imageLoad( imageGBuffer2, sti + ivec2( 0, 1 ) ).a );
+
+	colors[ 0 ] = imageLoad( imageHistory, sti + ivec2( 0, 0 ) ).rgb;
+	colors[ 1 ] = imageLoad( imageHistory, sti + ivec2( 1, 0 ) ).rgb;
+	colors[ 2 ] = imageLoad( imageHistory, sti + ivec2( 1, 1 ) ).rgb;
+	colors[ 3 ] = imageLoad( imageHistory, sti + ivec2( 0, 1 ) ).rgb;
+
+	lumas[ 0 ] = imageLoad( imageLumaHistory, sti + ivec2( 0, 0 ) );
+	lumas[ 1 ] = imageLoad( imageLumaHistory, sti + ivec2( 1, 0 ) );
+	lumas[ 2 ] = imageLoad( imageLumaHistory, sti + ivec2( 1, 1 ) );
+	lumas[ 3 ] = imageLoad( imageLumaHistory, sti + ivec2( 0, 1 ) );
+
+	vec2 st = fract( velocity.xy );
+	weights[ 0 ] = ( 1.0 - st.x ) * ( 1.0 - st.y );
+	weights[ 1 ] = ( st.x ) * ( 1.0 - st.y );
+	weights[ 2 ] = ( st.x ) * ( st.y );
+	weights[ 3 ] = ( 1.0 - st.x ) * ( st.y );
+
+	const int numTaps = 1;
+	//const int numTaps = 4;
+
+	float weightSum = 0;
+	for ( int i = 0; i < numTaps; i++ ) {
+		// Discard any bad taps
+		vec3 dp = positions[ i ] - worldPos;
+		float dn = dot( normals[ i ], worldNormal );
+
+		// TODO: Add a MeshID check
+		bool wasOccluded = false;
+		wasOccluded = !IsCoplanar( worldPos, worldNormal, positions[ i ] );
+		wasOccluded = wasOccluded || !IsNormalSimilar( worldNormal, normals[ i ] );
+		if ( modelID != modelIDs[ i ] ) {
+			wasOccluded = true;
+		}
+
+		//wasOccluded = ( length( dp ) > 0.01 || dn < 0.9 );
+		//if ( length( dp ) > 0.01 || dn < 0.9 ) {	// play with these thresholds and see what works well
+		if ( wasOccluded ) {
+			weights[ i ] = 0;
+			continue;
+		}
+
+		if ( numTaps > 1 ) {
+			weightSum += weights[ i ];
+		} else {
+			weights[ 0 ] = 1;
+			weightSum = 1;
+		}
+	}
+	//dstColor.rgb = velocity.xyz;	// DEBUG HACK
+	if ( 0 == weightSum ) {
+		numHistory = 0;
+		return false;
+	}
+
+	numHistory = imageLoad( imageHistoryCounter, sti ).r;
+
+	dstColor = vec3( 0 );
+	dstLuma = vec4( 0 );
+	for ( int i = 0; i < numTaps; i++ ) {
+		weights[ i ] = weights[ i ] / weightSum;	// Redistribute the weights
+		dstColor += colors[ i ] * weights[ i ];
+
+		dstLuma += lumas[ i ] * weights[ i ];
+	}
+
+	// Calculate luminance and determine the differnce
+	float srcLuminance = dot( vec3( 0.2126, 0.7152, 0.0722 ), srcColor );
+	float dstLuminance = dot( vec3( 0.2126, 0.7152, 0.0722 ), dstColor );
+	varianceSqr = dstLuminance * dstLuminance - srcLuminance * srcLuminance;
+
+	return true;
+}
+
+/*
+ ==========================
+ main
+ ==========================
+ */
+void main() {
+	ivec2 st = ivec2( gl_GlobalInvocationID.xy );
+	if ( st.x >= 1920 || st.y >= 1080 ) {
+		return;
+	}
+
+	vec4 gbuffer0 = imageLoad( imageGBuffer0, st );
+    vec4 gbuffer1 = imageLoad( imageGBuffer1, st );
+    vec4 gbuffer2 = imageLoad( imageGBuffer2, st );
+
+	vec3 worldPos = gbuffer0.xyz;
+    vec3 diffuse = gbuffer1.rgb;
+    vec3 normal = gbuffer2.xyz;
+
+	float roughness = gbuffer0.a;
+    float metalness = gbuffer1.a;
+
+    if ( 0 == gbuffer2.a ) {
+		imageStore( imageDest, st, vec4( 1, 0, 1, 1 ) );
+		imageStore( imageHistoryCounter, st, uvec4( 0 ) );
+		imageStore( imageLuma, st, vec4( 0 ) );
+		return;
+    }
+	uint modelID = uint( gbuffer2.a );
+
+	float varianceSqr = 0;
+	uint numHistory = 0;
+	vec3 historyColor = vec3( 0 );
+	vec4 historyLuma = vec4( 0 );
+	vec3 sourceColor = imageLoad( imageSource, st ).rgb;
+	bool didHistory = false;
+	didHistory = SampleHistory( modelID, worldPos, normal, sourceColor, historyColor, varianceSqr, numHistory, historyLuma );
+	if ( !didHistory ) {
+		historyColor = sourceColor;
+	}
+
+	//float alpha = 0.2;
+	//vec3 color = alpha * sourceColor + ( 1.0 - alpha ) * historyColor;
+	//vec3 color = mix( historyColor, sourceColor, alpha );	// Should be equivalent to above
+
+	float alpha = 1.0 / float( numHistory + 1 );
+	vec3 color = mix( historyColor, sourceColor, alpha );	// Should be equivalent to above
+	//color.r = float( modelID ) / 4096.0;
+
+	// compute first two moments of luminance
+	vec2 moments;
+	moments.r    = Luminance( color );
+	moments.g    = moments.r * moments.r;
+
+	// temporal integration of the moments
+	moments = mix( historyLuma.rg, moments, alpha );
+
+	float variance = max( moments.g - moments.r * moments.r, 0.0 );
+	imageStore( imageLuma, st, vec4( moments.r, moments.g, variance, 0.0 ) );
+
+	// TODO: Calculate the variance of the luminance from the old to new color
+	//		Store the variance in the alpha channel
+	//		It will be used by the edge-aware a-trous wavelet transform
+	imageStore( imageDest, st, vec4( color.r, color.g, color.b, varianceSqr ) );
+	imageStore( imageHistoryCounter, st, uvec4( numHistory + 1 ) );
+}
+
+
+ 
+ 

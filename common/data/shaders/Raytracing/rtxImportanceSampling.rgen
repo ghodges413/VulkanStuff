@@ -1,0 +1,240 @@
+#version 460
+#extension GL_NV_ray_tracing : require
+
+layout( binding = 0, set = 0 ) uniform accelerationStructureNV topLevelAS;
+
+layout( binding = 1, set = 0, rgba16f ) uniform writeonly image2D image;
+layout( binding = 2, set = 0, rgba32f ) uniform readonly image2D imageGBuffer0;
+layout( binding = 3, set = 0, rgba16f ) uniform readonly image2D imageGBuffer1;
+layout( binding = 4, set = 0, rgba16f ) uniform readonly image2D imageGBuffer2;
+
+//#define MAX_LIGHTS 128
+#define MAX_LIGHTS 32
+
+struct pointLight_t {
+	vec4 mSphere;	// xyz = position, w = radius, these are in world space coordinates
+	vec4 mColor;	// rgb = color, a = intensity
+};
+layout( std430, binding = 5 ) buffer bufferLights {
+	pointLight_t pointLights[];
+};
+
+struct reservoir_t {
+	vec3 start;
+	int lightIdx;
+
+	vec3 end;
+	float weightSum;
+};
+layout( std430, binding = 6 ) buffer sampleReservoir {
+	reservoir_t reservoir[];
+};
+
+/*
+layout( binding = 4, set = 0 ) uniform CameraProperties
+{
+	mat4 view;
+	mat4 proj;
+} cam;
+*/
+layout( push_constant ) uniform frameCount {
+	uint count;
+} PushConstant;
+
+struct record_t {
+	vec4 pos;
+	vec4 norm;
+	vec4 color;
+};
+layout( location = 0 ) rayPayloadNV record_t hitValue;
+
+
+uint wang_hash( uint seed ) {
+    seed = ( seed ^ 61 ) ^ ( seed >> 16 );
+    seed *= 9;
+    seed = seed ^ ( seed >> 4 );
+    seed *= 0x27d4eb2d;
+    seed = seed ^ ( seed >> 15 );
+    return seed;
+}
+
+
+// Generates a seed for a random number generator from 2 inputs plus a backoff
+// https://github.com/nvpro-samples/optix_prime_baking/blob/master/random.h
+// https://en.wikipedia.org/wiki/Tiny_Encryption_Algorithm
+uint InitRandomSeed( uint val0, uint val1 ) {
+	uint v0 = val0, v1 = val1, s0 = 0;
+
+	for (uint n = 0; n < 16; n++) {
+		s0 += 0x9e3779b9;
+		v0 += ((v1 << 4) + 0xa341316c) ^ (v1 + s0) ^ ((v1 >> 5) + 0xc8013ea4);
+		v1 += ((v0 << 4) + 0xad90777d) ^ (v0 + s0) ^ ((v0 >> 5) + 0x7e95761e);
+	}
+
+	return v0;
+}
+
+uint RandomInt( inout uint seed ) {
+	// LCG values from Numerical Recipes
+    return (seed = 1664525 * seed + 1013904223);
+}
+
+float RandomFloat( inout uint seed ) {
+	// Float version using bitmask from Numerical Recipes
+	const uint one = 0x3f800000;
+	const uint msk = 0x007fffff;
+	return uintBitsToFloat( one | ( msk & ( RandomInt( seed ) >> 9 ) ) ) - 1;
+}
+
+vec2 RandomInUnitDisk( inout uint seed ) {
+	for (;;) {
+		const vec2 p = 2 * vec2( RandomFloat( seed ), RandomFloat( seed ) ) - 1;
+		if ( dot( p, p ) < 1 ) {
+			return p;
+		}
+	}
+}
+
+vec3 RandomInUnitSphere( inout uint seed ) {
+	for (;;) {
+		const vec3 p = 2 * vec3( RandomFloat( seed ), RandomFloat( seed ), RandomFloat( seed ) ) - 1;
+		if ( dot( p, p ) < 1 && dot( p, p ) > 0.00001 ) {
+			return p;
+		}
+	}
+}
+
+/*
+==========================================
+AddSample
+==========================================
+*/
+reservoir_t AddSample( in reservoir_t douche, inout uint seed ) {
+	//reservoir_t sample;
+	reservoir_t newSample = douche;
+	float w = douche.weightSum;
+
+	// TODO: group the reservoirs in squares so that this is cache friendlier
+	uint reservoirIdx = gl_LaunchIDNV.y * 1920 + gl_LaunchIDNV.x;
+	reservoir_t oldSample = reservoir[ reservoirIdx ];
+
+	//float weight = oldSample.weightSum + w;
+	reservoir[ reservoirIdx ].weightSum += w;
+	float weight = reservoir[ reservoirIdx ].weightSum;
+
+	if ( RandomFloat( seed ) < ( w / weight ) ) {
+		newSample.weightSum = weight;
+		reservoir[ reservoirIdx ] = newSample;
+		return newSample;
+	}
+
+	return oldSample;
+}
+
+/*
+==========================================
+GenerateSample
+==========================================
+*/
+reservoir_t GenerateSample( in vec3 x0, inout uint seed, in vec3 normal ) {
+	// TODO: group the reservoirs in squares so that this is cache friendlier
+	uint reservoirIdx = gl_LaunchIDNV.y * 1920 + gl_LaunchIDNV.x;
+	reservoir[ reservoirIdx ].weightSum = 0;
+
+	reservoir_t douche;
+	douche.start = x0;
+	for ( int i = 0; i < MAX_LIGHTS; i++ ) {
+		pointLight_t light = pointLights[ i ];
+		douche.end = light.mSphere.xyz;
+		douche.lightIdx = i;
+		//float w = ??
+		vec3 dir = douche.end - douche.start;
+		float dirLength = length( dir );
+		dir = normalize( dir );
+		//float dotdot = dot( normal, dir );
+		//float w = ( 1.0 / 128.0 ) * light.mSphere.w / length( douche.start - douche.end );
+		float w = ( 1.0 / float( MAX_LIGHTS ) ) * light.mSphere.w * max( 0.0, dot( normal, dir ) ) / dirLength;
+		douche.weightSum = w;
+		AddSample( douche, seed );
+
+		seed = wang_hash( seed + PushConstant.count );
+	}
+
+	return reservoir[ reservoirIdx ];
+}
+
+/*
+==========================================
+main
+==========================================
+*/
+void main() {
+	vec4 gbuffer0 = imageLoad( imageGBuffer0, ivec2( gl_LaunchIDNV.xy ) );
+    vec4 gbuffer1 = imageLoad( imageGBuffer1, ivec2( gl_LaunchIDNV.xy ) );
+    vec4 gbuffer2 = imageLoad( imageGBuffer2, ivec2( gl_LaunchIDNV.xy ) );
+
+	vec3 worldPos = gbuffer0.xyz;
+    vec3 diffuse = gbuffer1.rgb;
+    vec3 normal = gbuffer2.xyz;
+
+	float roughness = gbuffer0.a;
+    float metalness = gbuffer1.a;
+
+    if ( 0 == gbuffer2.a ) {
+		imageStore( image, ivec2( gl_LaunchIDNV.xy ), vec4( 1, 0, 1, 1 ) );
+		return;
+    }
+
+	//
+	//	Generate Sample
+	//
+    uint seed = InitRandomSeed( gl_LaunchIDNV.x, gl_LaunchIDNV.y );
+	seed = wang_hash( seed + PushConstant.count );
+
+	reservoir_t douche = GenerateSample( worldPos, seed, normal );
+
+	uint lightIdx = seed % MAX_LIGHTS;
+	//uint lightIdx = seed % 128;
+	lightIdx = uint( douche.lightIdx );
+	pointLight_t light = pointLights[ lightIdx ];
+
+
+
+
+	float dist = length( light.mSphere.xyz - worldPos );
+
+	vec3 rayStart = worldPos;
+	//vec3 rayDir = normalize( vec3( 1, 1, 1 ) );
+	//vec3 rayDir = normalize( light.mSphere.xyz );
+	vec3 rayDir = normalize( light.mSphere.xyz - worldPos );
+	uint rayFlags = gl_RayFlagsOpaqueNV;
+	uint cullMask = 0xff;
+	uint sbtRecordOffset = 0;
+	uint sbtRecordStride = 0;
+	uint missIndex = 0;
+	float tmin = 0.0125;
+	float tmax = dist;//1000.0;
+	const int payload = 0;	
+
+	traceNV( topLevelAS, rayFlags, cullMask, sbtRecordOffset, sbtRecordStride, missIndex, rayStart.xyz, tmin, rayDir.xyz, tmax, payload );
+	
+	// If we missed, then the light isn't occluded
+	if ( hitValue.color.a < 0.0 ) {
+		vec4 skyColor;
+		skyColor.r = hitValue.color.r;
+		skyColor.g = hitValue.color.g;
+		skyColor.b = hitValue.color.b;
+		skyColor.a = 1.0;
+
+		float dotdot = dot( rayDir, normal );
+		diffuse = vec3( 1 );
+		//dotdot = 1.0;
+		skyColor.rgb = diffuse * dotdot * light.mColor.rgb * light.mColor.w / dist;
+		imageStore( image, ivec2( gl_LaunchIDNV.xy ), skyColor );
+		return;
+	}
+
+	//imageStore( image, ivec2( gl_LaunchIDNV.xy ), vec4( diffuse.r, diffuse.g, diffuse.b, 1 ) );
+	imageStore( image, ivec2( gl_LaunchIDNV.xy ), vec4( 0, 0, 0, 1 ) );
+}
+

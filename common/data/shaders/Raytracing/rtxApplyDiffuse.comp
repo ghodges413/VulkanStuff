@@ -1,0 +1,42 @@
+#version 450
+
+#define WORK_GROUP_SIZE 8
+layout ( local_size_x = WORK_GROUP_SIZE, local_size_y = WORK_GROUP_SIZE, local_size_z = 1 ) in;
+
+layout( binding = 0, rgba16f ) uniform image2D imageDest; // The denoised light buffer and our output buffer
+
+layout( binding = 1, rgba32f ) uniform readonly image2D imageGBuffer0;
+layout( binding = 2, rgba16f ) uniform readonly image2D imageGBuffer1;
+layout( binding = 3, rgba16f ) uniform readonly image2D imageGBuffer2;
+
+/*
+ ==========================
+ main
+ ==========================
+ */
+void main() {
+	ivec2 st = ivec2( gl_GlobalInvocationID.xy );
+	if ( st.x >= 1920 || st.y >= 1080 ) {
+		return;
+	}
+
+	vec4 gbuffer0 = imageLoad( imageGBuffer0, st );
+    vec4 gbuffer1 = imageLoad( imageGBuffer1, st );
+    vec4 gbuffer2 = imageLoad( imageGBuffer2, st );
+
+	vec3 worldPos = gbuffer0.xyz;
+    vec3 diffuse = gbuffer1.rgb;
+    vec3 normal = gbuffer2.xyz;
+
+	float roughness = gbuffer0.a;
+    float metalness = gbuffer1.a;
+
+    if ( 0 == gbuffer2.a ) {
+		imageStore( imageDest, st, vec4( 1, 0, 1, 1 ) );
+		return;
+    }
+
+	vec3 lighting = imageLoad( imageDest, st ).rgb;
+	vec3 finalColor = lighting * diffuse;
+	imageStore( imageDest, st, vec4( finalColor, 1.0 ) );
+}

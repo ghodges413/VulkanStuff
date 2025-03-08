@@ -1,0 +1,159 @@
+#version 450
+
+
+#define WORK_GROUP_SIZE 8
+layout ( local_size_x = WORK_GROUP_SIZE, local_size_y = WORK_GROUP_SIZE, local_size_z = 1 ) in;
+
+//layout( binding = 0, rg32f ) uniform readonly image2D sourceTex;
+//layout ( binding = 1 ) uniform writeonly image2D destTex;
+/*
+layout( binding = 0, set = 0, rgba16f ) uniform writeonly image2D imageDest;
+layout( binding = 1, set = 0, rgba16f ) uniform readonly image2D imageSource;
+layout( binding = 2, set = 0, rgba32f ) uniform readonly image2D imageGBuffer0;
+layout( binding = 3, set = 0, rgba16f ) uniform readonly image2D imageGBuffer1;
+layout( binding = 4, set = 0, rgba16f ) uniform readonly image2D imageGBuffer2;
+*/
+layout( binding = 0 ) uniform writeonly image2D imageDest;
+
+layout( binding = 1, rgba16f ) uniform readonly image2D imageSource;
+layout( binding = 2, rgba32f ) uniform readonly image2D imageGBuffer0;
+layout( binding = 3, rgba16f ) uniform readonly image2D imageGBuffer1;
+layout( binding = 4, rgba16f ) uniform readonly image2D imageGBuffer2;
+
+//layout( binding = 5, rgba16f ) uniform readonly image2D imageHistory;
+layout( binding = 6, rgba32f ) uniform readonly image2D imageGBufferHistory0;
+layout( binding = 7, rgba16f ) uniform readonly image2D imageGBufferHistory1;
+layout( binding = 8, rgba16f ) uniform readonly image2D imageGBufferHistory2;
+
+//layout( binding = 9, rgba16f ) uniform readonly image2D imageVelocity;
+
+//shared vec2 groupData[ 256 ];
+
+/*
+ ==========================
+ SampleHistory
+ ==========================
+ */
+bool SampleHistory( in vec3 worldPos, in vec3 worldNormal, in vec4 srcColor, out vec4 dstColor ) {
+	dstColor = srcColor;
+	dstColor.a = 0;
+
+	ivec2 sti = ivec2( gl_GlobalInvocationID.xy );
+    vec4 velocity = imageLoad( imageVelocity, sti );
+	velocity.xy *= vec2( 1920, 1080 );
+	velocity.xy += vec2( sti.x, sti.y );
+
+	// Sample the 2x2 pixel block and blend between them
+	sti = ivec2( velocity.xy );
+
+	vec3 positions[ 4 ];
+	vec3 normals[ 4 ];
+	vec3 colors[ 4 ];
+	float weights[ 4 ];
+
+	positions[ 0 ] = imageLoad( imageGBuffer0, sti + ivec2( 0, 0 ) ).xyz;
+	positions[ 1 ] = imageLoad( imageGBuffer0, sti + ivec2( 1, 0 ) ).xyz;
+	positions[ 2 ] = imageLoad( imageGBuffer0, sti + ivec2( 1, 1 ) ).xyz;
+	positions[ 3 ] = imageLoad( imageGBuffer0, sti + ivec2( 0, 1 ) ).xyz;
+
+	normals[ 0 ] = imageLoad( imageGBuffer2, sti + ivec2( 0, 0 ) ).xyz;
+	normals[ 1 ] = imageLoad( imageGBuffer2, sti + ivec2( 1, 0 ) ).xyz;
+	normals[ 2 ] = imageLoad( imageGBuffer2, sti + ivec2( 1, 1 ) ).xyz;
+	normals[ 3 ] = imageLoad( imageGBuffer2, sti + ivec2( 0, 1 ) ).xyz;
+
+	colors[ 0 ] = imageLoad( imageHistory, sti + ivec2( 0, 0 ) ).rgb;
+	colors[ 1 ] = imageLoad( imageHistory, sti + ivec2( 1, 0 ) ).rgb;
+	colors[ 2 ] = imageLoad( imageHistory, sti + ivec2( 1, 1 ) ).rgb;
+	colors[ 3 ] = imageLoad( imageHistory, sti + ivec2( 0, 1 ) ).rgb;
+
+	vec2 st = fract( velocity.xy );
+	weights[ 0 ] = ( 1.0 - st.x ) * ( 1.0 - st.y );
+	weights[ 1 ] = ( st.x ) * ( 1.0 - st.y );
+	weights[ 2 ] = ( st.x ) * ( st.y );
+	weights[ 3 ] = ( 1.0 - st.x ) * ( st.y );
+
+	float weightSum = 0;
+	for ( int i = 0; i < 4; i++ ) {
+		// Discard any bad taps
+		vec3 dp = positions[ i ] - worldPos;
+		float dn = dot( normals[ i ], worldNormal );
+
+		// The paper also compares Mesh id's.  But we're not doing that here.
+		// Because I am lazy and would need to add that data to the g-buffer.
+		// Comparing positions and normals should be good enough.
+
+		if ( length( dn ) > 0.01 || dn < 0.9 ) {	// play with these thresholds and see what works well
+			weights[ i ] = 0;
+			continue;
+		}
+
+		weightSum += weights[ i ];
+	}
+	if ( 0 == weightSum ) {
+		return false;
+	}
+
+	dstColor = vec4( 0 );
+	for ( int i = 0; i < 4; i++ ) {
+		weights[ i ] = weights[ i ] / weightSum;	// Redistribute the weights
+		dstColor.rgb += colors[ i ] * weights[ i ];
+	}
+
+	// Calculate luminance and determine the differnce
+	float srcLuminance = dot( vec3( 0.2126, 0.7152, 0.0722 ), srcColor.rgb );
+	float dstLuminance = dot( vec3( 0.2126, 0.7152, 0.0722 ), dstColor.rgb );
+	float varianceSqr = dstLuminance * dstLuminance - srcLuminance * srcLuminance;
+	dstColor.a = varianceSqr;
+
+	return true;
+}
+
+/*
+ ==========================
+ main
+ ==========================
+ */
+void main() {
+	ivec2 st = ivec2( gl_GlobalInvocationID.xy );
+	if ( st.x >= 1920 || st.y >= 1080 ) {
+		return;
+	}
+
+	vec4 gbuffer0 = imageLoad( imageGBuffer0, st );
+    vec4 gbuffer1 = imageLoad( imageGBuffer1, st );
+    vec4 gbuffer2 = imageLoad( imageGBuffer2, st );
+
+	vec3 worldPos = gbuffer0.xyz;
+    vec3 diffuse = gbuffer1.rgb;
+    vec3 normal = gbuffer2.xyz;
+
+	float roughness = gbuffer0.a;
+    float metalness = gbuffer1.a;
+
+    if ( 0 == gbuffer2.a ) {
+		imageStore( imageDest, st, vec4( 1, 0, 1, 1 ) );
+		return;
+    }
+
+	vec3 historyColor = vec3( 0 );
+	vec3 sourceColor = imageLoad( imageSource, st ).rgb;
+	bool didHistory = SampleHistory( worldPos, normal, sourceColor, historyColor );
+
+	float alpha = 0.2;
+	//vec3 color = alpha * sourceColor + ( 1.0 - alpha ) * historyColor;
+	vec3 color = mix( historyColor, sourceColor, alpha );	// Should be equivalent to above
+
+	// TODO: Calculate the variance of the luminance from the old to new color
+	//		Store the variance in the alpha channel
+	//		It will be used by the edge-aware a-trous wavelet transform
+	imageStore( imageDest, st, vec4( color.r, color.g, color.b, 1 ) );
+
+	// These are hard coded values that the authors of the SVGF paper found worked
+	float sigmaZ = 1;
+	float sigmaN = 128;
+	float sigmaL = 4;
+}
+
+
+ 
+ 

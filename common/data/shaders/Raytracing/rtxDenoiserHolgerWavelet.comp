@@ -1,0 +1,121 @@
+#version 450
+// This denoiser is based on the paper: https://jo.dreggn.org/home/2010_atrous.pdf
+// Edge-Avoiding À-Trous Wavelet Transform for fast Global Illumination Filtering
+
+#define WORK_GROUP_SIZE 8
+layout ( local_size_x = WORK_GROUP_SIZE, local_size_y = WORK_GROUP_SIZE, local_size_z = 1 ) in;
+
+layout( push_constant ) uniform pushIters {
+    ivec4 iteration;
+} PushConstant;
+
+layout( binding = 0 ) uniform writeonly image2D imageDest;	// The buffer that will be filtered
+
+layout( binding = 1, rgba16f ) uniform readonly image2D imageSource;	// The accumulated color buffer
+layout( binding = 2, rgba32f ) uniform readonly image2D imageGBuffer0;
+layout( binding = 3, rgba16f ) uniform readonly image2D imageGBuffer1;
+layout( binding = 4, rgba16f ) uniform readonly image2D imageGBuffer2;
+
+const float kernels[5] = { 1.0/16.0, 1.0/4.0, 3.0/8.0, 1.0/4.0, 1.0/16.0 };
+
+// Smaller values sharpen, larger values blur more
+// I don't know what values here work best.  This would take a lot of experimenting.
+const float sigmaZ = 0.01;
+const float sigmaN = 10.1;//128;
+const float sigmaL = 8.4;
+
+/*
+ ==========================
+ FilterWeightPos
+ ==========================
+ */
+float FilterWeightPos( in vec3 pPos, in vec3 qPos ) {
+	vec3 dp = pPos - qPos;
+	float wp = exp( -dot( dp, dp ) / sigmaZ );
+	return min( wp, 1.0 );
+}
+
+/*
+ ==========================
+ FilterWeightNorm
+ ==========================
+ */
+float FilterWeightNorm( in vec3 pNorm, in vec3 qNorm, in float dx ) {
+	vec3 dn = pNorm - qNorm;
+	float wn = max( dot( dn, dn ) / ( dx * dx ), 0.0 );
+	return min( exp( -wn / sigmaN ), 1.0 );
+}
+
+/*
+ ==========================
+ FilterWeightLuminance
+ ==========================
+ */
+float FilterWeightLuminance( in vec3 pColor, in vec3 qColor ) {
+	vec3 dc = pColor - qColor;
+	float wc = exp( -dot( dc, dc ) / sigmaL );
+	return min( wc, 1.0 );
+}
+
+/*
+ ==========================
+ main
+ ==========================
+ */
+void main() {
+	ivec2 st = ivec2( gl_GlobalInvocationID.xy );
+	if ( st.x >= 1920 || st.y >= 1080 ) {
+		return;
+	}
+
+	vec4 gbuffer0 = imageLoad( imageGBuffer0, st );
+    vec4 gbuffer1 = imageLoad( imageGBuffer1, st );
+    vec4 gbuffer2 = imageLoad( imageGBuffer2, st );
+
+	vec3 worldPos = gbuffer0.xyz;
+    vec3 diffuse = gbuffer1.rgb;
+    vec3 normal = gbuffer2.xyz;
+
+	float roughness = gbuffer0.a;
+    float metalness = gbuffer1.a;
+
+    if ( 0 == gbuffer2.a ) {
+		imageStore( imageDest, st, vec4( 1, 0, 1, 1 ) );
+		return;
+    }
+
+	vec3 pPos = worldPos;
+	vec3 pNorm = normal;
+	vec3 pColor = imageLoad( imageSource, st ).xyz;
+
+	// Sample the 5x5 pixel block and convolve with filter weights
+	int iter = PushConstant.iteration.x;
+	int dx = ( 1 << iter );
+
+	float denominator = 0;
+	vec3 numerator = vec3( 0 );
+	for ( int j = 0; j < 5; j++ ) {
+		for ( int i = 0; i < 5; i++ ) {
+			float kernel = kernels[ i ] * kernels[ j ];
+
+			int x = ( i - 2 );// 0 = -2, 1 = -1, 2 = 0, 3 = 1, 3 = 2
+			int y = ( j - 2 );// 0 = -2, 1 = -1, 2 = 0, 3 = 1, 3 = 2
+			ivec2 offset = ivec2( x, y ) * dx;
+
+			vec3 qPos = imageLoad( imageGBuffer0, st + offset ).xyz;
+			vec3 qNorm = imageLoad( imageGBuffer2, st + offset ).xyz;
+			vec3 qColor = imageLoad( imageSource, st + offset ).xyz;
+
+			float wZ = FilterWeightPos( pPos, qPos );
+			float wN = FilterWeightNorm( pNorm, qNorm, dx );
+			float wL = FilterWeightLuminance( pColor, qColor );
+			float wpq = wZ * wN * wL;
+
+			numerator += kernel * wpq * qColor;
+			denominator += kernel * wpq;
+		}
+	}
+
+	vec3 color = numerator / denominator;
+	imageStore( imageDest, st, vec4( color.rgb, 1 ) );
+}

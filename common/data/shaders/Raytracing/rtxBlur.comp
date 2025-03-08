@@ -1,0 +1,143 @@
+#version 450
+
+layout( binding = 0, rgba8 ) uniform image2D dstTex;
+
+layout( binding = 1, rgba8 ) uniform readonly image2D srcTex;
+layout( binding = 2, rgba16f ) uniform readonly image2D srcTexPos;
+layout( binding = 3, rgba16f ) uniform readonly image2D srcTexNorms;
+
+layout ( local_size_x = 16, local_size_y = 16 ) in;
+
+//in uvec3 gl_NumWorkGroups;
+//in uvec3 gl_WorkGroupID;
+//in uvec3 gl_LocalInvocationID;
+//in uvec3 gl_GlobalInvocationID;
+//in uint  gl_LocalInvocationIndex;
+
+/*
+==========================
+BlurKernel
+==========================
+*/
+vec3 BlurKernel( in ivec2 st ) {
+	vec4 color = imageLoad( srcTex, st );
+	vec4 colorX0 = imageLoad( srcTex, st + ivec2( 1, 0 ) );
+	vec4 colorX1 = imageLoad( srcTex, st + ivec2( -1, 0 ) );
+	vec4 colorX2 = imageLoad( srcTex, st + ivec2( 2, 0 ) );
+	vec4 colorX3 = imageLoad( srcTex, st + ivec2( -2, 0 ) );
+	
+	vec4 colorY0 = imageLoad( srcTex, st + ivec2( 0, 1 ) );
+	vec4 colorY1 = imageLoad( srcTex, st + ivec2( 0, -1 ) );
+	vec4 colorY2 = imageLoad( srcTex, st + ivec2( 0, 2 ) );
+	vec4 colorY3 = imageLoad( srcTex, st + ivec2( 0, -2 ) );
+	
+	float w[ 5 ];
+	w[ 0 ] = 4.0 / 10.0;
+	w[ 1 ] = 2.0 / 10.0;
+	w[ 2 ] = 2.0 / 10.0;
+	w[ 3 ] = 1.0 / 10.0;
+	w[ 4 ] = 1.0 / 10.0;
+	
+	vec3 rgbX = color.rgb * w[ 0 ] + colorX0.rgb * w[ 1 ] + colorX1.rgb * w[ 2 ] + colorX2.rgb * w[ 3 ] + colorX3.rgb * w[ 4 ];
+	vec3 rgbY = color.rgb * w[ 0 ] + colorY0.rgb * w[ 1 ] + colorY1.rgb * w[ 2 ] + colorY2.rgb * w[ 3 ] + colorY3.rgb * w[ 4 ];
+	
+	vec3 rgb = ( rgbX + rgbY ) * 0.5;
+	return rgb;
+}
+
+/*
+==========================
+BlurKernel2
+==========================
+*/
+vec3 BlurKernel2( in ivec2 st ) {
+	vec4 color = imageLoad( srcTex, st );
+	vec4 colorX0 = imageLoad( srcTex, st + ivec2( 1, 0 ) );
+	vec4 colorX1 = imageLoad( srcTex, st + ivec2( -1, 0 ) );
+	vec4 colorX2 = imageLoad( srcTex, st + ivec2( 2, 0 ) );
+	vec4 colorX3 = imageLoad( srcTex, st + ivec2( -2, 0 ) );
+	
+	vec4 colorY0 = imageLoad( srcTex, st + ivec2( 0, 1 ) );
+	vec4 colorY1 = imageLoad( srcTex, st + ivec2( 0, -1 ) );
+	vec4 colorY2 = imageLoad( srcTex, st + ivec2( 0, 2 ) );
+	vec4 colorY3 = imageLoad( srcTex, st + ivec2( 0, -2 ) );
+	
+	
+	vec4 normal = imageLoad( srcTexNorms, st );
+	vec4 normalX0 = imageLoad( srcTexNorms, st + ivec2( 1, 0 ) );
+	vec4 normalX1 = imageLoad( srcTexNorms, st + ivec2( -1, 0 ) );
+	vec4 normalX2 = imageLoad( srcTexNorms, st + ivec2( 2, 0 ) );
+	vec4 normalX3 = imageLoad( srcTexNorms, st + ivec2( -2, 0 ) );
+	
+	vec4 normalY0 = imageLoad( srcTexNorms, st + ivec2( 0, 1 ) );
+	vec4 normalY1 = imageLoad( srcTexNorms, st + ivec2( 0, -1 ) );
+	vec4 normalY2 = imageLoad( srcTexNorms, st + ivec2( 0, 2 ) );
+	vec4 normalY3 = imageLoad( srcTexNorms, st + ivec2( 0, -2 ) );
+	
+	
+	float weights[ 5 ];
+	weights[ 0 ] = 4.0 / 10.0;
+	weights[ 1 ] = 2.0 / 10.0;
+	weights[ 2 ] = 2.0 / 10.0;
+	weights[ 3 ] = 1.0 / 10.0;
+	weights[ 4 ] = 1.0 / 10.0;
+	
+	//
+	//	Blur horizontally
+	//
+	
+	float w[ 5 ];
+	w[ 0 ] = weights[ 0 ] * 1.0;
+	w[ 1 ] = weights[ 1 ] * max( 0.0, dot( normal, normalX0 ) );
+	w[ 2 ] = weights[ 2 ] * max( 0.0, dot( normal, normalX1 ) );
+	w[ 3 ] = weights[ 3 ] * max( 0.0, dot( normal, normalX2 ) );
+	w[ 4 ] = weights[ 4 ] * max( 0.0, dot( normal, normalX3 ) );
+	
+	// Renormalize the weights
+	float sum = w[ 0 ] + w[ 1 ] + w[ 2 ] + w[ 3 ] + w[ 4 ];
+	w[ 0 ] /= sum;
+	w[ 1 ] /= sum;
+	w[ 2 ] /= sum;
+	w[ 3 ] /= sum;
+	w[ 4 ] /= sum;
+	
+	vec3 rgbX = color.rgb * w[ 0 ] + colorX0.rgb * w[ 1 ] + colorX1.rgb * w[ 2 ] + colorX2.rgb * w[ 3 ] + colorX3.rgb * w[ 4 ];
+	
+	//
+	//	Blur vertically
+	//
+	
+	w[ 0 ] = weights[ 0 ] * 1.0;
+	w[ 1 ] = weights[ 1 ] * max( 0.0, dot( normal, normalY0 ) );
+	w[ 2 ] = weights[ 2 ] * max( 0.0, dot( normal, normalY1 ) );
+	w[ 3 ] = weights[ 3 ] * max( 0.0, dot( normal, normalY2 ) );
+	w[ 4 ] = weights[ 4 ] * max( 0.0, dot( normal, normalY3 ) );
+	
+	// Renormalize the weights
+	sum = w[ 0 ] + w[ 1 ] + w[ 2 ] + w[ 3 ] + w[ 4 ];
+	w[ 0 ] /= sum;
+	w[ 1 ] /= sum;
+	w[ 2 ] /= sum;
+	w[ 3 ] /= sum;
+	w[ 4 ] /= sum;
+
+	vec3 rgbY = color.rgb * w[ 0 ] + colorY0.rgb * w[ 1 ] + colorY1.rgb * w[ 2 ] + colorY2.rgb * w[ 3 ] + colorY3.rgb * w[ 4 ];
+	
+	
+	vec3 rgb = ( rgbX + rgbY ) * 0.5;
+	return rgb;
+}
+
+/*
+==========================
+main
+==========================
+*/
+void main() {
+	ivec2 storePos = ivec2( gl_GlobalInvocationID.xy );
+	
+	vec4 final = vec4( 0, 0, 0, 1 );
+	final.rgb = BlurKernel2( storePos );
+	imageStore( dstTex, storePos, final );
+}
+
