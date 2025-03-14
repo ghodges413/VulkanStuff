@@ -17,8 +17,8 @@
 Pipeline	g_rtxMonteCarloPipeline;
 Descriptors	g_rtxMonteCarloDescriptors;
 
-Pipeline	g_rtxReStirPipeline;
-Descriptors	g_rtxReStirDescriptors;
+Pipeline	g_rtxImportanceSamplingPipeline;
+Descriptors	g_rtxImportanceSamplingDescriptors;
 
 Pipeline	g_rtxDenoiserPipeline;
 Descriptors	g_rtxDenoiserDescriptors;
@@ -153,7 +153,7 @@ bool InitRaytracing( DeviceContext * device, int width, int height ) {
 		descriptorParms.numUniformsRayGen = 1;
 		descriptorParms.numStorageImagesRayGen = 4;
 		descriptorParms.numStorageBuffersRayGen = 2;
-		result = g_rtxReStirDescriptors.Create( device, descriptorParms );
+		result = g_rtxImportanceSamplingDescriptors.Create( device, descriptorParms );
 		if ( !result ) {
 			return false;
 		}
@@ -163,13 +163,13 @@ bool InitRaytracing( DeviceContext * device, int width, int height ) {
 		//
 		Pipeline::CreateParms_t pipelineParms;
 		memset( &pipelineParms, 0, sizeof( pipelineParms ) );
-		pipelineParms.descriptors = &g_rtxReStirDescriptors;
+		pipelineParms.descriptors = &g_rtxImportanceSamplingDescriptors;
 		pipelineParms.width = width;
 		pipelineParms.height = height;
 		pipelineParms.pushConstantSize = sizeof( int );
 		pipelineParms.pushConstantShaderStages = VkShaderStageFlagBits::VK_SHADER_STAGE_RAYGEN_BIT_NV;
 		pipelineParms.shader = g_shaderManager->GetShader( "Raytracing/rtxImportanceSampling" );
-		result = g_rtxReStirPipeline.CreateRayTracing( device, pipelineParms );
+		result = g_rtxImportanceSamplingPipeline.CreateRayTracing( device, pipelineParms );
 		if ( !result ) {
 			return false;
 		}
@@ -449,8 +449,8 @@ void CleanupRaytracing( DeviceContext * device ) {
 	g_rtxMonteCarloPipeline.Cleanup( device );
 	g_rtxMonteCarloDescriptors.Cleanup( device );
 
-	g_rtxReStirPipeline.Cleanup( device );
-	g_rtxReStirDescriptors.Cleanup( device );
+	g_rtxImportanceSamplingPipeline.Cleanup( device );
+	g_rtxImportanceSamplingDescriptors.Cleanup( device );
 
 	g_rtxDenoiserPipeline.Cleanup( device );
 	g_rtxDenoiserDescriptors.Cleanup( device );
@@ -554,7 +554,7 @@ void DrawRaytracing( DrawParms_t & parms ) {
 	//
 	//	Ray Tracing
 	//
-#if 0	// 1 = Monte Carlo, 0 = ReSTIR
+#if 0	// 1 = Monte Carlo, 0 = Importance Sampling
 	{
 		g_rtxMonteCarloPipeline.BindPipelineRayTracing( cmdBuffer );
 		g_rtxMonteCarloPipeline.BindPushConstant( cmdBuffer, 0, sizeof( g_numFrames ), &g_numFrames );
@@ -573,10 +573,10 @@ void DrawRaytracing( DrawParms_t & parms ) {
 	}
 #else
 	{
-		g_rtxReStirPipeline.BindPipelineRayTracing( cmdBuffer );
-		g_rtxReStirPipeline.BindPushConstant( cmdBuffer, 0, sizeof( g_numFrames ), &g_numFrames );
+		g_rtxImportanceSamplingPipeline.BindPipelineRayTracing( cmdBuffer );
+		g_rtxImportanceSamplingPipeline.BindPushConstant( cmdBuffer, 0, sizeof( g_numFrames ), &g_numFrames );
 
-		Descriptor descriptor = g_rtxReStirPipeline.GetRTXDescriptor();
+		Descriptor descriptor = g_rtxImportanceSamplingPipeline.GetRTXDescriptor();
 		descriptor.BindAccelerationStructure( &g_rtxAccelerationStructure, 0 );
 		descriptor.BindStorageImage( g_rtxImage, Samplers::m_samplerStandard, 1 );
 
@@ -586,8 +586,8 @@ void DrawRaytracing( DrawParms_t & parms ) {
 
 		descriptor.BindStorageBuffer( &g_lightsStorageBuffer, 0, g_lightsStorageBuffer.m_vkBufferSize, 5 );
 		descriptor.BindStorageBuffer( &g_rtxReservoirBuffer, 0, g_rtxReservoirBuffer.m_vkBufferSize, 6 );
-		descriptor.BindDescriptor( device, cmdBuffer, &g_rtxReStirPipeline );
-		g_rtxReStirPipeline.TraceRays( cmdBuffer );
+		descriptor.BindDescriptor( device, cmdBuffer, &g_rtxImportanceSamplingPipeline );
+		g_rtxImportanceSamplingPipeline.TraceRays( cmdBuffer );
 	}
 #endif
 	g_rtxImageOut = &g_rtxImage;
