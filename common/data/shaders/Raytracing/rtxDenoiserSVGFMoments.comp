@@ -1,0 +1,242 @@
+#version 450
+// This denoiser is based on the paper: https://research.nvidia.com/publication/2017-07_spatiotemporal-variance-guided-filtering-real-time-reconstruction-path-traced
+// Spatiotemporal Variance-Guided Filtering: Real-Time Reconstruction for Path-Traced Global Illumination
+
+#define WORK_GROUP_SIZE 8
+layout ( local_size_x = WORK_GROUP_SIZE, local_size_y = WORK_GROUP_SIZE, local_size_z = 1 ) in;
+
+layout( binding = 0 ) uniform uboCamera {
+    mat4 view;
+    mat4 proj;
+} camera;
+
+layout( binding = 1 ) uniform writeonly image2D imageDest;	// The buffer that will be filtered
+
+layout( binding = 2, rgba16f ) uniform readonly image2D imageSource;	// The accumulated color buffer
+layout( binding = 3, rgba32f ) uniform readonly image2D imageGBuffer0;
+layout( binding = 4, rgba16f ) uniform readonly image2D imageGBuffer1;
+layout( binding = 5, rgba16f ) uniform readonly image2D imageGBuffer2;
+
+layout( binding = 6, rgba16f ) uniform readonly image2D imageLumaSrc;
+layout( binding = 7, rgba16f ) uniform writeonly image2D imageLumaDst;
+
+layout( binding = 8, r32ui ) uniform readonly uimage2D imageHistoryCounter;	// read write history counter
+
+
+// These are hard coded values that the authors of the SVGF paper found worked
+const float sigmaZ = 1;
+const float sigmaN = 128;
+const float sigmaL = 4;
+
+const float epsilonZ = 0.001;
+const float epsilonL = 0.001;
+
+float gradP = 0;
+
+/*
+==========================
+FilterWeightPos
+==========================
+*/
+float FilterWeightPos( in float pDepth, in vec3 qPos ) {
+	vec4 qPosProj = camera.proj * camera.view * vec4( qPos.xyz, 1.0 );
+	float qDepth = qPosProj.z / qPosProj.w;
+
+	float gradZp = gradP;
+	float numerator = abs( pDepth - qDepth );
+	float denominator = sigmaZ * abs( gradZp * ( pDepth - qDepth ) ) + epsilonZ;
+	return exp( -numerator / denominator );
+}
+
+/*
+==========================
+FilterWeightNorm
+==========================
+*/
+float FilterWeightNorm( in vec3 pNorm, in vec3 qNorm ) {
+	return pow( max( 0.0, dot( pNorm, qNorm ) ), sigmaN );
+}
+
+/*
+==========================
+FilterWeightLuminance
+==========================
+*/
+float FilterWeightLuminance( in vec4 pColor, in vec4 qColor, in vec4 luma ) {
+	float pLum = dot( vec3( 0.2126, 0.7152, 0.0722 ), pColor.rgb );
+	float qLum = dot( vec3( 0.2126, 0.7152, 0.0722 ), qColor.rgb );
+
+	//float varianceSqr = pColor.a;	// Stored from the accumulator shader
+	float varianceSqr = abs( luma.z );
+	float numerator = abs( pLum - qLum );
+	float denominator = sigmaL * sqrt( varianceSqr ) + epsilonL;
+	//return exp( -numerator / denominator );
+	return 1;
+}
+
+/*
+==========================
+FilterWeightLuminance2
+==========================
+*/
+float FilterWeightLuminance2( in vec4 pColor, in vec4 qColor, in float varSqr ) {
+	float pLum = dot( vec3( 0.2126, 0.7152, 0.0722 ), pColor.rgb );
+	float qLum = dot( vec3( 0.2126, 0.7152, 0.0722 ), qColor.rgb );
+
+	//const float sigmaColor = 10.0;
+	//const float epsilonVar = 1e-10;
+	//float denominator = sigmaColor * sqrt( max( 0.0, epsilonVar + varSqr ) );
+	//float denominator = sigmaColor * sqrt( max( 0.0, varSqr ) ) + epsilonVar;
+	//float denominator = sigmaL * sqrt( max( 0.0, varSqr ) ) + epsilonL;
+	float denominator = sigmaL * sqrt( abs( varSqr ) ) + epsilonL;
+
+	const float weight = abs( pLum - qLum ) / denominator;
+	return exp( -weight );
+	//return 1;
+}
+
+/*
+==========================
+main
+==========================
+*/
+void main() {
+	ivec2 st = ivec2( gl_GlobalInvocationID.xy );
+	if ( st.x >= 1920 || st.y >= 1080 ) {
+		return;
+	}
+
+	// If the number of history samples is less than 4, then simply pass the color without any filtering
+	uint numHistory = imageLoad( imageHistoryCounter, st ).r;
+	if ( numHistory < 4 ) {
+		vec4 srcColor = imageLoad( imageSource, st );
+		imageStore( imageDest, st, srcColor );
+
+		vec4 srcMoments = imageLoad( imageLumaSrc, st );
+		imageStore( imageLumaDst, st, srcMoments );
+		return;
+	}
+
+	vec4 gbuffer0 = imageLoad( imageGBuffer0, st );
+    vec4 gbuffer1 = imageLoad( imageGBuffer1, st );
+    vec4 gbuffer2 = imageLoad( imageGBuffer2, st );
+
+	vec3 worldPos = gbuffer0.xyz;
+    vec3 diffuse = gbuffer1.rgb;
+    vec3 normal = gbuffer2.xyz;
+
+	float roughness = gbuffer0.a;
+    float metalness = gbuffer1.a;
+
+    if ( 0 == gbuffer2.a ) {
+		imageStore( imageDest, st, vec4( 1, 0, 1, 1 ) );
+		return;
+    }
+
+	//
+	//	Calculate the gradient of the depth
+	//
+	float pDepth = 0;
+	{
+		vec4 posPX = imageLoad( imageGBuffer0, st + ivec2( 1, 0 ) );
+		vec4 posPY = imageLoad( imageGBuffer0, st + ivec2( 0, 1 ) );
+		vec4 posNX = imageLoad( imageGBuffer0, st + ivec2(-1, 0 ) );
+		vec4 posNY = imageLoad( imageGBuffer0, st + ivec2( 0,-1 ) );
+
+		posPX = camera.proj * camera.view * vec4( posPX.xyz, 1.0 );
+		posPY = camera.proj * camera.view * vec4( posPY.xyz, 1.0 );
+		posNX = camera.proj * camera.view * vec4( posNX.xyz, 1.0 );
+		posNY = camera.proj * camera.view * vec4( posNY.xyz, 1.0 );
+
+		posPX /= posPX.w;
+		posPY /= posPY.w;
+		posNX /= posNX.w;
+		posNY /= posNY.w;
+
+		vec4 projPos = camera.proj * camera.view * vec4( worldPos.xyz, 1.0 );
+		projPos /= projPos.w;
+		pDepth = projPos.z;
+
+		float dDepthX = ( posPX.z - posNX.z ) * 0.5 / projPos.z;	// We divied by projPos.z to "normalize" the depth
+		float dDepthY = ( posPY.z - posNY.z ) * 0.5 / projPos.z;
+
+		// TODO: Both of these are tried in real world code, but experiment and see what works for us
+		gradP = sqrt( dDepthX * dDepthX + dDepthY * dDepthY );
+		gradP = max( abs( dDepthX ), abs( dDepthY ) );
+	}
+
+	vec3 pNorm = normal;
+	vec4 pColor = imageLoad( imageSource, st );
+
+	// compute first and second moment spatially. This code also applies cross-bilateral
+	// filtering on the input illumination.
+	float sumW = 0;
+	vec4 sumColor = vec4( 0 );
+	vec4 sumMoments = vec4( 0 );
+	const int radius = 3;	// 7x7 filter
+	for ( int yy = -radius; yy <= radius; yy++ ) {
+		for ( int xx = -radius; xx <= radius; xx++ ) {
+			ivec2 stq = st + ivec2( xx, yy );
+			if ( stq.x < 0 || stq.y < 0 || stq.x >= 1920 || stq.y >= 1080 ) {
+				continue;
+			}
+
+			vec3 qPos = imageLoad( imageGBuffer0, stq ).xyz;
+			vec3 qNorm = imageLoad( imageGBuffer2, stq ).xyz;
+			vec4 qColor = imageLoad( imageSource, stq );			
+
+			float qLuma = dot( vec3( 0.2126, 0.7152, 0.0722 ), qColor.rgb );
+
+			vec4 qMoments = imageLoad( imageLumaSrc, stq );
+			//const float3 illuminationP = gIllumination[p].rgb;
+			//const float2 momentsP = gMoments[p].xy;
+			//const float lIlluminationP = luminance(illuminationP.rgb);
+			//const float zP = gLinearZAndNormal[p].x;
+			//const float3 nP = oct_to_ndir_snorm(gLinearZAndNormal[p].zw);
+/*
+			const float w = computeWeight(
+				zCenter.x,
+				zP,
+				phiDepth * length(float2(xx, yy)),
+				nCenter,
+				nP,
+				gPhiNormal,
+				lIlluminationCenter,
+				lIlluminationP,
+				phiLIllumination
+			);
+*/
+			float wZ = FilterWeightPos( pDepth, qPos );
+			float wN = FilterWeightNorm( pNorm, qNorm );
+			float wL = FilterWeightLuminance( pColor, qColor, vec4( qLuma ) );
+			//float wL = FilterWeightLuminance2( pColor, qColor, varSqr );
+			float wpq = wZ * wN * wL;
+
+			sumW += wpq;
+			sumColor += qColor * wpq;
+			sumMoments += qMoments * wpq;
+		}
+	}
+
+	// Clamp sum to >0 to avoid NaNs.
+	sumW = max( sumW, 1e-6f );
+
+	sumColor /= sumW;
+	sumMoments /= sumW;
+
+	// compute variance using the first and second moments
+	float variance = sumMoments.g - sumMoments.r * sumMoments.r;
+
+	// give the variance a boost for the first frames
+	variance *= 4.0 / float( numHistory );
+
+	//return vec4(sumIllumination, variance.r);
+
+	// Average the luma's and calculate the variance
+	//momentSum /= wSum;
+	float lumaVariance = variance;//momentSum.g - momentSum.r * momentSum.r;
+	imageStore( imageLumaDst, st, vec4( sumMoments.x, sumMoments.y, lumaVariance, 0 ) );
+
+	//vec3 color = numerator / denominator;
+	imageStore( imageDest, st, vec4( sumColor.rgb, variance ) );
+}

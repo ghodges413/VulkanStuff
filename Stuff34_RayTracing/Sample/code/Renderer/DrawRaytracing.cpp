@@ -26,6 +26,9 @@ Descriptors	g_rtxDenoiserDescriptors;
 Pipeline	g_rtxSVGFDenoiserAccumulatorPipeline;
 Descriptors	g_rtxSVGFDenoiserAccumulatorDescriptors;
 
+Pipeline	g_rtxSVGFDenoiserMomentsPipeline;
+Descriptors	g_rtxSVGFDenoiserMomentsDescriptors;
+
 Pipeline	g_rtxSVGFDenoiserWaveletPipeline;
 Descriptors	g_rtxSVGFDenoiserWaveletDescriptors;
 
@@ -77,7 +80,7 @@ Image g_rtxImageDenoised;
 Image g_gbufferHistory[ 3 ];
 
 Image g_rtxImageHistory;
-Image g_rtxImageHistoryCounter;
+Image g_rtxImageHistoryCounters[ 2 ];
 
 Image g_rtxImageLumaA;
 Image g_rtxImageLumaB;
@@ -216,7 +219,7 @@ bool InitRaytracing( DeviceContext * device, int width, int height ) {
 		Descriptors::CreateParms_t descriptorParms;
 		memset( &descriptorParms, 0, sizeof( descriptorParms ) );
 		descriptorParms.type = Descriptors::TYPE_COMPUTE;
-		descriptorParms.numStorageImagesCompute = 13;
+		descriptorParms.numStorageImagesCompute = 14;
 		result = g_rtxSVGFDenoiserAccumulatorDescriptors.Create( device, descriptorParms );
 		if ( !result ) {
 			return false;
@@ -236,7 +239,7 @@ bool InitRaytracing( DeviceContext * device, int width, int height ) {
 	}
 
 	//
-	//	Holger Denoiser Wavelet Pipeline
+	//	SVGF Denoiser Moments Pipeline
 	//
 	{
 		//
@@ -245,8 +248,9 @@ bool InitRaytracing( DeviceContext * device, int width, int height ) {
 		Descriptors::CreateParms_t descriptorParms;
 		memset( &descriptorParms, 0, sizeof( descriptorParms ) );
 		descriptorParms.type = Descriptors::TYPE_COMPUTE;
-		descriptorParms.numStorageImagesCompute = 5;
-		result = g_rtxDenoiserHolgerWaveletDescriptors.Create( device, descriptorParms );
+		descriptorParms.numUniformsCompute = 1;
+		descriptorParms.numStorageImagesCompute = 8;
+		result = g_rtxSVGFDenoiserMomentsDescriptors.Create( device, descriptorParms );
 		if ( !result ) {
 			return false;
 		}
@@ -256,11 +260,9 @@ bool InitRaytracing( DeviceContext * device, int width, int height ) {
 		//
 		Pipeline::CreateParms_t pipelineParms;
 		memset( &pipelineParms, 0, sizeof( pipelineParms ) );
-		pipelineParms.descriptors = &g_rtxDenoiserHolgerWaveletDescriptors;
-		pipelineParms.pushConstantSize = sizeof( int ) * 4;
-		pipelineParms.pushConstantShaderStages = VkShaderStageFlagBits::VK_SHADER_STAGE_COMPUTE_BIT;
-		pipelineParms.shader = g_shaderManager->GetShader( "Raytracing/rtxDenoiserHolgerWavelet" );
-		result = g_rtxDenoiserHolgerWaveletPipeline.CreateCompute( device, pipelineParms );
+		pipelineParms.descriptors = &g_rtxSVGFDenoiserMomentsDescriptors;
+		pipelineParms.shader = g_shaderManager->GetShader( "Raytracing/rtxDenoiserSVGFMoments" );
+		result = g_rtxSVGFDenoiserMomentsPipeline.CreateCompute( device, pipelineParms );
 		if ( !result ) {
 			return false;
 		}
@@ -299,6 +301,37 @@ bool InitRaytracing( DeviceContext * device, int width, int height ) {
 	}
 	
 	//
+	//	Holger Denoiser Wavelet Pipeline
+	//
+	{
+		//
+		//	Create descriptors
+		//
+		Descriptors::CreateParms_t descriptorParms;
+		memset( &descriptorParms, 0, sizeof( descriptorParms ) );
+		descriptorParms.type = Descriptors::TYPE_COMPUTE;
+		descriptorParms.numStorageImagesCompute = 5;
+		result = g_rtxDenoiserHolgerWaveletDescriptors.Create( device, descriptorParms );
+		if ( !result ) {
+			return false;
+		}
+
+		//
+		//	Create Pipeline
+		//
+		Pipeline::CreateParms_t pipelineParms;
+		memset( &pipelineParms, 0, sizeof( pipelineParms ) );
+		pipelineParms.descriptors = &g_rtxDenoiserHolgerWaveletDescriptors;
+		pipelineParms.pushConstantSize = sizeof( int ) * 4;
+		pipelineParms.pushConstantShaderStages = VkShaderStageFlagBits::VK_SHADER_STAGE_COMPUTE_BIT;
+		pipelineParms.shader = g_shaderManager->GetShader( "Raytracing/rtxDenoiserHolgerWavelet" );
+		result = g_rtxDenoiserHolgerWaveletPipeline.CreateCompute( device, pipelineParms );
+		if ( !result ) {
+			return false;
+		}
+	}
+	
+	//
 	//	Apply Diffuse Channel
 	//
 	{
@@ -320,8 +353,6 @@ bool InitRaytracing( DeviceContext * device, int width, int height ) {
 		Pipeline::CreateParms_t pipelineParms;
 		memset( &pipelineParms, 0, sizeof( pipelineParms ) );
 		pipelineParms.descriptors = &g_rtxApplyDiffuseDescriptors;
-// 		pipelineParms.pushConstantSize = sizeof( int ) * 4;
-// 		pipelineParms.pushConstantShaderStages = VkShaderStageFlagBits::VK_SHADER_STAGE_COMPUTE_BIT;
 		pipelineParms.shader = g_shaderManager->GetShader( "Raytracing/rtxApplyDiffuse" );
 		result = g_rtxApplyDiffusePipeline.CreateCompute( device, pipelineParms );
 		if ( !result ) {
@@ -383,7 +414,8 @@ bool InitRaytracing( DeviceContext * device, int width, int height ) {
 	}
 
 	imageParms.format = VkFormat::VK_FORMAT_R32_UINT;
-	result = g_rtxImageHistoryCounter.Create( device, imageParms );
+	result = g_rtxImageHistoryCounters[ 0 ].Create( device, imageParms );
+	result = result && g_rtxImageHistoryCounters[ 1 ].Create( device, imageParms );
 	if ( !result ) {
 		printf( "Unable to build rtx history image!\n" );
 		assert( 0 );
@@ -429,6 +461,9 @@ void CleanupRaytracing( DeviceContext * device ) {
 	g_rtxSVGFDenoiserAccumulatorPipeline.Cleanup( device );
 	g_rtxSVGFDenoiserAccumulatorDescriptors.Cleanup( device );
 
+	g_rtxSVGFDenoiserMomentsPipeline.Cleanup( device );
+	g_rtxSVGFDenoiserMomentsDescriptors.Cleanup( device );
+
 	g_rtxSVGFDenoiserWaveletPipeline.Cleanup( device );
 	g_rtxSVGFDenoiserWaveletDescriptors.Cleanup( device );
 
@@ -439,7 +474,8 @@ void CleanupRaytracing( DeviceContext * device ) {
 
 	g_rtxImage.Cleanup( device );
 	g_rtxImageHistory.Cleanup( device );
-	g_rtxImageHistoryCounter.Cleanup( device );
+	g_rtxImageHistoryCounters[ 0 ].Cleanup( device );
+	g_rtxImageHistoryCounters[ 1 ].Cleanup( device );
 	g_rtxImageAccumulated.Cleanup( device );
 	g_rtxImageDenoised.Cleanup( device );
 
@@ -505,7 +541,8 @@ void DrawRaytracing( DrawParms_t & parms ) {
 	g_rtxImageAccumulated.TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_GENERAL );
 	g_rtxImageDenoised.TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_GENERAL );
 	g_rtxImageHistory.TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_GENERAL );
-	g_rtxImageHistoryCounter.TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_GENERAL );
+	g_rtxImageHistoryCounters[ 0 ].TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_GENERAL );
+	g_rtxImageHistoryCounters[ 1 ].TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_GENERAL );
 	g_gbufferHistory[ 0 ].TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_GENERAL );
 	g_gbufferHistory[ 1 ].TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_GENERAL );
 	g_gbufferHistory[ 2 ].TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_GENERAL );
@@ -577,6 +614,9 @@ void DrawRaytracing( DrawParms_t & parms ) {
 #else
 	// Accumulator
 	{
+		Image * imgHistoryCounterSrc = &g_rtxImageHistoryCounters[ ( g_numFrames + 0 ) & 1 ];
+		Image * imgHistoryCounterDst = &g_rtxImageHistoryCounters[ ( g_numFrames + 1 ) & 1 ];
+
 		g_rtxSVGFDenoiserAccumulatorPipeline.BindPipelineCompute( cmdBuffer );
 
 		// Descriptor is how we bind our buffers and images
@@ -589,16 +629,17 @@ void DrawRaytracing( DrawParms_t & parms ) {
 		descriptor.BindStorageImage( g_gbuffer.m_imageColor[ 2 ], Samplers::m_samplerStandard, 4 );
 
 		descriptor.BindStorageImage( g_rtxImageHistory, Samplers::m_samplerStandard, 5 );
-		descriptor.BindStorageImage( g_rtxImageHistoryCounter, Samplers::m_samplerStandard, 6 );
+		descriptor.BindStorageImage( *imgHistoryCounterSrc, Samplers::m_samplerStandard, 6 );
+		descriptor.BindStorageImage( *imgHistoryCounterDst, Samplers::m_samplerStandard, 7 );
 
-		descriptor.BindStorageImage( g_gbufferHistory[ 0 ], Samplers::m_samplerStandard, 7 );
-		descriptor.BindStorageImage( g_gbufferHistory[ 1 ], Samplers::m_samplerStandard, 8 );
-		descriptor.BindStorageImage( g_gbufferHistory[ 2 ], Samplers::m_samplerStandard, 9 );
+		descriptor.BindStorageImage( g_gbufferHistory[ 0 ], Samplers::m_samplerStandard, 8 );
+		descriptor.BindStorageImage( g_gbufferHistory[ 1 ], Samplers::m_samplerStandard, 9 );
+		descriptor.BindStorageImage( g_gbufferHistory[ 2 ], Samplers::m_samplerStandard, 10 );
 
-		descriptor.BindStorageImage( g_taaVelocityBuffer.m_imageColor, Samplers::m_samplerStandard, 10 );
+		descriptor.BindStorageImage( g_taaVelocityBuffer.m_imageColor, Samplers::m_samplerStandard, 11 );
 
-		descriptor.BindStorageImage( g_rtxImageLumaA, Samplers::m_samplerStandard, 11 );
-		descriptor.BindStorageImage( g_rtxImageLumaHistory, Samplers::m_samplerStandard, 12 );
+		descriptor.BindStorageImage( g_rtxImageLumaA, Samplers::m_samplerStandard, 12 );
+		descriptor.BindStorageImage( g_rtxImageLumaHistory, Samplers::m_samplerStandard, 13 );
 
 		descriptor.BindDescriptor( device, cmdBuffer, &g_rtxSVGFDenoiserAccumulatorPipeline );
 		g_rtxSVGFDenoiserAccumulatorPipeline.DispatchCompute( cmdBuffer, ( 1920 + 7 ) / 8, ( 1080 + 7 ) / 8, 1 );
@@ -606,7 +647,9 @@ void DrawRaytracing( DrawParms_t & parms ) {
 	g_rtxImageOut = &g_rtxImageAccumulated;
 
 	MemoryBarriers::CreateImageMemoryBarrier( cmdBuffer, g_rtxImageAccumulated, VK_IMAGE_ASPECT_COLOR_BIT );
+	int startIdx = 0;
 
+#if 0
 	// Copy the accumulated image into the history buffer
 	{
 		g_rtxImageAccumulated.TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL );
@@ -631,9 +674,73 @@ void DrawRaytracing( DrawParms_t & parms ) {
 
 	//g_rtxImageOut = &g_rtxImageLuma;
 
+#else
+	//
+	//	SVGF Temporal Variance Filter
+	//
+	{
+		int i = 0;
+		Image * srcImage = ( ( i & 1 ) == 0 ) ? &g_rtxImageAccumulated : &g_rtxImageDenoised;
+		Image * dstImage = ( ( i & 1 ) == 0 ) ? &g_rtxImageDenoised : &g_rtxImageAccumulated;
+
+		Image * srcLuma = ( ( i & 1 ) == 0 ) ? &g_rtxImageLumaA : &g_rtxImageLumaB;
+		Image * dstLuma = ( ( i & 1 ) == 0 ) ? &g_rtxImageLumaB : &g_rtxImageLumaA;
+
+		// The source and destination history counters have swapped after the accumulator pass
+		Image * imgHistoryCounterSrc = &g_rtxImageHistoryCounters[ ( g_numFrames + 1 ) & 1 ];
+		Image * imgHistoryCounterDst = &g_rtxImageHistoryCounters[ ( g_numFrames + 0 ) & 1 ];
+
+		g_rtxSVGFDenoiserMomentsPipeline.BindPipelineCompute( cmdBuffer );
+
+		// Descriptor is how we bind our buffers and images
+		Descriptor descriptor = g_rtxSVGFDenoiserMomentsPipeline.GetFreeDescriptor();
+		descriptor.BindBuffer( uniforms, camOffset, camSize, 0 );
+
+		descriptor.BindStorageImage( *dstImage, Samplers::m_samplerStandard, 1 );
+		descriptor.BindStorageImage( *srcImage, Samplers::m_samplerStandard, 2 );
+		descriptor.BindStorageImage( g_gbuffer.m_imageColor[ 0 ], Samplers::m_samplerStandard, 3 );
+		descriptor.BindStorageImage( g_gbuffer.m_imageColor[ 1 ], Samplers::m_samplerStandard, 4 );
+		descriptor.BindStorageImage( g_gbuffer.m_imageColor[ 2 ], Samplers::m_samplerStandard, 5 );
+
+		descriptor.BindStorageImage( *srcLuma, Samplers::m_samplerStandard, 6 );
+		descriptor.BindStorageImage( *dstLuma, Samplers::m_samplerStandard, 7 );
+
+		descriptor.BindStorageImage( *imgHistoryCounterSrc, Samplers::m_samplerStandard, 8 );
+
+		descriptor.BindDescriptor( device, cmdBuffer, &g_rtxSVGFDenoiserMomentsPipeline );
+		g_rtxSVGFDenoiserMomentsPipeline.DispatchCompute( cmdBuffer, ( 1920 + 7 ) / 8, ( 1080 + 7 ) / 8, 1 );
+
+		MemoryBarriers::CreateImageMemoryBarrier( cmdBuffer, *dstImage, VK_IMAGE_ASPECT_COLOR_BIT );
+
+		g_rtxImageOut = dstImage;
+		startIdx = 1;
+
+		// Copy the first temporal filtered image into the history buffer
+		{
+			dstImage->TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL );
+			g_rtxImageHistory.TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL );
+
+			Image::CopyImage( g_rtxImageHistory, *dstImage, cmdBuffer );
+
+			dstImage->TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_GENERAL );
+			g_rtxImageHistory.TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_GENERAL );
+		}
+
+		// Copy the luma image into the luma history buffer
+		{
+			dstLuma->TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL );
+			g_rtxImageLumaHistory.TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL );
+
+			Image::CopyImage( g_rtxImageLumaHistory, *dstLuma, cmdBuffer );
+
+			dstLuma->TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_GENERAL );
+			g_rtxImageLumaHistory.TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_GENERAL );
+		}
+	}
+#endif
 #if 1
 	// SVGF Edge Avoiding Wavelet Filter
-	for ( int i = 0; i < 5; i++ ) {
+	for ( int i = startIdx; i < 5 + startIdx; i++ ) {
 		int inters[4];
 		inters[ 0 ] = i;
 		inters[ 1 ] = i;

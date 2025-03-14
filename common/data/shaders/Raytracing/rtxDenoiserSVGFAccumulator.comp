@@ -21,16 +21,17 @@ layout( binding = 3, rgba16f ) uniform readonly image2D imageGBuffer1;
 layout( binding = 4, rgba16f ) uniform readonly image2D imageGBuffer2;
 
 layout( binding = 5, rgba16f ) uniform readonly image2D imageHistory;
-layout( binding = 6, r32ui ) uniform uimage2D imageHistoryCounter;	// read write history counter
+layout( binding = 6, r32ui ) uniform readonly uimage2D imageHistoryCounterSrc;	// read write history counter
+layout( binding = 7, r32ui ) uniform writeonly uimage2D imageHistoryCounterDst;	// read write history counter
 
-layout( binding = 7, rgba32f ) uniform readonly image2D imageGBufferHistory0;
-layout( binding = 8, rgba16f ) uniform readonly image2D imageGBufferHistory1;
-layout( binding = 9, rgba16f ) uniform readonly image2D imageGBufferHistory2;
+layout( binding = 8, rgba32f ) uniform readonly image2D imageGBufferHistory0;
+layout( binding = 9, rgba16f ) uniform readonly image2D imageGBufferHistory1;
+layout( binding = 10, rgba16f ) uniform readonly image2D imageGBufferHistory2;
 
-layout( binding = 10, rgba16f ) uniform readonly image2D imageVelocity;
+layout( binding = 11, rgba16f ) uniform readonly image2D imageVelocity;
 
-layout( binding = 11, rgba16f ) uniform image2D imageLuma;
-layout( binding = 12, rgba16f ) uniform readonly image2D imageLumaHistory;
+layout( binding = 12, rgba16f ) uniform image2D imageLuma;
+layout( binding = 13, rgba16f ) uniform readonly image2D imageLumaHistory;
 
 //shared vec2 groupData[ 256 ];
 
@@ -149,7 +150,7 @@ bool SampleHistory( in uint modelID, in vec3 worldPos, in vec3 worldNormal, in v
 		return false;
 	}
 
-	numHistory = imageLoad( imageHistoryCounter, sti ).r;
+	numHistory = imageLoad( imageHistoryCounterSrc, sti ).r;
 
 	dstColor = vec3( 0 );
 	dstLuma = vec4( 0 );
@@ -192,7 +193,7 @@ void main() {
 
     if ( 0 == gbuffer2.a ) {
 		imageStore( imageDest, st, vec4( 1, 0, 1, 1 ) );
-		imageStore( imageHistoryCounter, st, uvec4( 0 ) );
+		imageStore( imageHistoryCounterDst, st, uvec4( 0 ) );
 		imageStore( imageLuma, st, vec4( 0 ) );
 		return;
     }
@@ -232,7 +233,7 @@ void main() {
 	//		Store the variance in the alpha channel
 	//		It will be used by the edge-aware a-trous wavelet transform
 	imageStore( imageDest, st, vec4( color.r, color.g, color.b, varianceSqr ) );
-	imageStore( imageHistoryCounter, st, uvec4( numHistory + 1 ) );
+	imageStore( imageHistoryCounterDst, st, uvec4( numHistory + 1 ) );
 }
 
 
