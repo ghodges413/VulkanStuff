@@ -151,9 +151,10 @@ reservoir_t GenerateSample( in vec3 x0, inout uint seed, in vec3 normal ) {
 		vec3 dir = douche.end - douche.start;
 		float dirLength = length( dir );
 		dir = normalize( dir );
-		//float dotdot = dot( normal, dir );
+		float dotdot = max( 0.0, dot( normal, dir ) );
+		float dot2 = dotdot * dotdot;
 		//float w = ( 1.0 / 128.0 ) * light.mSphere.w / length( douche.start - douche.end );
-		float w = ( 1.0 / float( MAX_LIGHTS ) ) * light.mSphere.w * max( 0.0, dot( normal, dir ) ) / dirLength;
+		float w = ( 1.0 / float( MAX_LIGHTS ) ) * light.mSphere.w * dot2 * dot2 / ( dirLength * dirLength );
 		douche.weightSum = w;
 		AddSample( douche, seed );
 
