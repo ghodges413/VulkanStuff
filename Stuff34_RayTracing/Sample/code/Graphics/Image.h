@@ -27,6 +27,7 @@ public:
 	bool Create( DeviceContext * device, const CreateParms_t & parms );
 	bool UploadData( DeviceContext * device, const void * data );
 	void GenerateMipMaps( DeviceContext * device, VkCommandBuffer vkCommandBuffer );
+	void GenerateMipMaps( DeviceContext * device );
 
 	void Cleanup( DeviceContext * device );
 	void TransitionLayout( DeviceContext * device );
@@ -43,8 +44,8 @@ public:
 	VkImageView		m_vkImageView;	// We might need to create an image view for every mip in order to access each mip in a compute shader
 	VkDeviceMemory	m_vkDeviceMemory;
 
-	static const int maxMipViews = 8;
-	VkImageView		m_vkImageMipChainViews[ maxMipViews ];	// 8 max mip levels?
+	static const int maxMipViews = 16;
+	VkImageView		m_vkImageMipChainViews[ maxMipViews ];	// 16 max mip levels?
 
 	VkImageLayout	m_vkImageLayout;
 };

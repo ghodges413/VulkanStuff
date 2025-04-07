@@ -332,7 +332,8 @@ bool Descriptors::Create( DeviceContext * device, const CreateParms_t & parms ) 
 		//
 		for ( int i = 0; i < parms.numStorageBuffersClosestHit; i++ ) {
 			uniformBindings[ idx ].binding = idx;
-			uniformBindings[ idx ].descriptorCount = 1;
+			//uniformBindings[ idx ].descriptorCount = 1;
+			uniformBindings[ idx ].descriptorCount = parms.numStorageBuffersClosestHitArraySize;
 			uniformBindings[ idx ].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
 			uniformBindings[ idx ].pImmutableSamplers = nullptr;
 			uniformBindings[ idx ].stageFlags = VK_SHADER_STAGE_CLOSEST_HIT_BIT_NV;
@@ -499,6 +500,41 @@ void Descriptor::BindStorageBuffer( Buffer * storageBuffer, int offset, int size
 
 /*
 ====================================================
+Descriptor::BindRenderModelsRTX
+====================================================
+*/
+void Descriptor::BindRenderModelsRTX( RenderModel * models, int num, int slotVertices, int slotIndices ) {
+	//
+	//	Vertex Buffer
+	//
+	m_rtxVertexDescriptors.clear();
+	for ( int i = 0; i < num; i++ ) {
+		VkDescriptorBufferInfo vertexDescriptor;
+		vertexDescriptor = {};
+		vertexDescriptor.buffer	= models[ i ].modelDraw->m_vertexBuffer.m_vkBuffer;
+		vertexDescriptor.offset	= 0;
+		vertexDescriptor.range = models[ i ].modelDraw->m_vertexBuffer.m_vkBufferSize;
+		m_rtxVertexDescriptors.push_back( vertexDescriptor );
+	}
+	m_rtxVertexDescriptorsSlot = slotVertices;
+
+	//
+	//	Index Buffer
+	//
+	m_rtxIndexDescriptors.clear();
+	for ( int i = 0; i < num; i++ ) {
+		VkDescriptorBufferInfo indexxDescriptor;
+		indexxDescriptor = {};
+		indexxDescriptor.buffer	= models[ i ].modelDraw->m_indexBuffer.m_vkBuffer;
+		indexxDescriptor.offset	= 0;
+		indexxDescriptor.range = models[ i ].modelDraw->m_indexBuffer.m_vkBufferSize;
+		m_rtxIndexDescriptors.push_back( indexxDescriptor );
+	}
+	m_rtxIndexDescriptorsSlot = slotIndices;
+}
+
+/*
+====================================================
 Descriptor::BindAccelerationStructure
 ====================================================
 */
@@ -529,7 +565,8 @@ Descriptor::UpdateDescriptor
 ====================================================
 */
 void Descriptor::UpdateDescriptor( DeviceContext * device ) {
-	const int numDescriptors = m_numImages + m_numBuffers + m_numStorageImages + m_numStorageBuffers + m_numAccelerationStructure;
+	const int rtxNumVertexDescriptors = ( m_rtxVertexDescriptors.size() > 0 && m_rtxIndexDescriptors.size() > 0 ) ? 2 : 0;
+	const int numDescriptors = m_numImages + m_numBuffers + m_numStorageImages + m_numStorageBuffers + m_numAccelerationStructure + rtxNumVertexDescriptors;
 	const int allocationSize = sizeof( VkWriteDescriptorSet ) * numDescriptors;
 	VkWriteDescriptorSet * descriptorWrites = (VkWriteDescriptorSet *)alloca( allocationSize );
 	memset( descriptorWrites, 0, allocationSize );
@@ -584,6 +621,32 @@ void Descriptor::UpdateDescriptor( DeviceContext * device ) {
 		descriptorWrites[ idx ].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
 		descriptorWrites[ idx ].descriptorCount = 1;
 		descriptorWrites[ idx ].pBufferInfo = &m_storageBufferInfo[ i ];
+
+		idx++;
+	}
+
+	// Write Storage Buffers RTX - Vertices
+	if ( m_rtxVertexDescriptors.size() > 0 ) {
+		descriptorWrites[ idx ].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		descriptorWrites[ idx ].dstSet = m_parent->m_vkDescriptorSets[ m_id ];
+		descriptorWrites[ idx ].dstBinding = m_rtxVertexDescriptorsSlot;
+		descriptorWrites[ idx ].dstArrayElement = 0;
+		descriptorWrites[ idx ].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+		descriptorWrites[ idx ].descriptorCount = m_rtxVertexDescriptors.size();
+		descriptorWrites[ idx ].pBufferInfo = m_rtxVertexDescriptors.data();
+
+		idx++;
+	}
+
+	// Write Storage Buffers RTX - Indices
+	if ( m_rtxIndexDescriptors.size() > 0 ) {
+		descriptorWrites[ idx ].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		descriptorWrites[ idx ].dstSet = m_parent->m_vkDescriptorSets[ m_id ];
+		descriptorWrites[ idx ].dstBinding = m_rtxIndexDescriptorsSlot;
+		descriptorWrites[ idx ].dstArrayElement = 0;
+		descriptorWrites[ idx ].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+		descriptorWrites[ idx ].descriptorCount = m_rtxIndexDescriptors.size();
+		descriptorWrites[ idx ].pBufferInfo = m_rtxIndexDescriptors.data();
 
 		idx++;
 	}

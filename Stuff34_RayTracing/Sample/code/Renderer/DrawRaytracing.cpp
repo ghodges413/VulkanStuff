@@ -14,6 +14,8 @@
 #include <stdio.h>
 #include <vector>
 
+static int g_numFrames = 0;
+
 Pipeline	g_rtxMonteCarloPipeline;
 Descriptors	g_rtxMonteCarloDescriptors;
 
@@ -94,6 +96,255 @@ extern const int g_numBaseLights;// = 128;
 extern const int g_maxWorldLights;// = 1024;	// This should be enough lights for our needs
 extern Buffer	g_lightsStorageBuffer;		// Storage buffer containing the list of point lights
 
+
+//
+//	Global Illumination Shaders + Images
+//
+
+Pipeline	g_rtxGIRaysPipeline;
+Descriptors	g_rtxGIRaysDescriptors;
+
+Pipeline	g_rtxGIAccumulatorPipeline;
+Descriptors	g_rtxGIAccumulatorDescriptors;
+
+Pipeline	g_rtxGIMomentsPipeline;
+Descriptors	g_rtxGIMomentsDescriptors;
+
+Pipeline	g_rtxGIWaveletPipeline;
+Descriptors	g_rtxGIWaveletDescriptors;
+
+Image g_rtxGIRawImages[ 3 ];	// The three raw SH images generated from the ray casting
+
+Image g_rtxGIAccumulatedImages[ 3 ];
+Image g_rtxGIAccumulatedImageHistory[ 3 ];
+Image g_rtxGIImageHistoryCounters[ 2 ];
+
+Image g_rtxGIImageDenoised[ 3 ];
+Image * g_rtxGIImageOut[ 3 ];
+
+Image g_rtxGIImageLumaA;
+Image g_rtxGIImageLumaB;
+Image g_rtxGIImageLumaHistory;
+
+Buffer g_rtxGIReservoirBuffer;
+
+
+
+/*
+====================================================
+InitGlobalIllumination
+====================================================
+*/
+bool InitGlobalIllumination( DeviceContext * device, int width, int height ) {
+	bool result = true;
+
+	//
+	//	GI Ray tracing Pipeline
+	//
+	{
+		//
+		//	Create descriptors
+		//
+		Descriptors::CreateParms_t descriptorParms;
+		memset( &descriptorParms, 0, sizeof( descriptorParms ) );
+		descriptorParms.type = Descriptors::TYPE_RAYTRACE;
+		descriptorParms.numAccelerationStructures = 1;
+		descriptorParms.numStorageImagesRayGen = 6;
+		descriptorParms.numStorageBuffersRayGen = 2;
+		descriptorParms.numStorageBuffersClosestHit = 3;
+		descriptorParms.numStorageBuffersClosestHitArraySize = 8192;	// The max array size of the descriptors (the max number of render models in this case)
+		result = g_rtxGIRaysDescriptors.Create( device, descriptorParms );
+		if ( !result ) {
+			return false;
+		}
+
+		//
+		//	Create Pipeline
+		//
+		Pipeline::CreateParms_t pipelineParms;
+		memset( &pipelineParms, 0, sizeof( pipelineParms ) );
+		pipelineParms.descriptors = &g_rtxGIRaysDescriptors;
+		pipelineParms.width = width;
+		pipelineParms.height = height;
+		pipelineParms.pushConstantSize = sizeof( int );
+		pipelineParms.pushConstantShaderStages = VkShaderStageFlagBits::VK_SHADER_STAGE_RAYGEN_BIT_NV;
+		pipelineParms.shader = g_shaderManager->GetShader( "Raytracing/rtxGIRays" );
+		result = g_rtxGIRaysPipeline.CreateRayTracing( device, pipelineParms );
+		if ( !result ) {
+			return false;
+		}
+	}
+
+	//
+	//	GI Accumulator Pipeline
+	//
+	{
+		//
+		//	Create descriptors
+		//
+		Descriptors::CreateParms_t descriptorParms;
+		memset( &descriptorParms, 0, sizeof( descriptorParms ) );
+		descriptorParms.type = Descriptors::TYPE_COMPUTE;
+		descriptorParms.numStorageImagesCompute = 20;
+		result = g_rtxGIAccumulatorDescriptors.Create( device, descriptorParms );
+		if ( !result ) {
+			return false;
+		}
+
+		//
+		//	Create Pipeline
+		//
+		Pipeline::CreateParms_t pipelineParms;
+		memset( &pipelineParms, 0, sizeof( pipelineParms ) );
+		pipelineParms.descriptors = &g_rtxGIAccumulatorDescriptors;
+		pipelineParms.shader = g_shaderManager->GetShader( "Raytracing/rtxGIAccumulator" );
+		result = g_rtxGIAccumulatorPipeline.CreateCompute( device, pipelineParms );
+		if ( !result ) {
+			return false;
+		}
+	}
+
+	//
+	//	GI Moments Pipeline
+	//
+	{
+		//
+		//	Create descriptors
+		//
+		Descriptors::CreateParms_t descriptorParms;
+		memset( &descriptorParms, 0, sizeof( descriptorParms ) );
+		descriptorParms.type = Descriptors::TYPE_COMPUTE;
+		descriptorParms.numUniformsCompute = 1;
+		descriptorParms.numStorageImagesCompute = 12;
+		result = g_rtxGIMomentsDescriptors.Create( device, descriptorParms );
+		if ( !result ) {
+			return false;
+		}
+
+		//
+		//	Create Pipeline
+		//
+		Pipeline::CreateParms_t pipelineParms;
+		memset( &pipelineParms, 0, sizeof( pipelineParms ) );
+		pipelineParms.descriptors = &g_rtxGIMomentsDescriptors;
+		pipelineParms.shader = g_shaderManager->GetShader( "Raytracing/rtxGIMoments" );
+		result = g_rtxGIMomentsPipeline.CreateCompute( device, pipelineParms );
+		if ( !result ) {
+			return false;
+		}
+	}
+
+	//
+	//	GI Wavelet Pipeline
+	//
+	{
+		//
+		//	Create descriptors
+		//
+		Descriptors::CreateParms_t descriptorParms;
+		memset( &descriptorParms, 0, sizeof( descriptorParms ) );
+		descriptorParms.type = Descriptors::TYPE_COMPUTE;
+		descriptorParms.numUniformsCompute = 1;
+		descriptorParms.numStorageImagesCompute = 12;
+		result = g_rtxGIWaveletDescriptors.Create( device, descriptorParms );
+		if ( !result ) {
+			return false;
+		}
+
+		//
+		//	Create Pipeline
+		//
+		Pipeline::CreateParms_t pipelineParms;
+		memset( &pipelineParms, 0, sizeof( pipelineParms ) );
+		pipelineParms.descriptors = &g_rtxGIWaveletDescriptors;
+		pipelineParms.pushConstantSize = sizeof( int ) * 4;
+		pipelineParms.pushConstantShaderStages = VkShaderStageFlagBits::VK_SHADER_STAGE_COMPUTE_BIT;
+		pipelineParms.shader = g_shaderManager->GetShader( "Raytracing/rtxGIWavelet" );
+		result = g_rtxGIWaveletPipeline.CreateCompute( device, pipelineParms );
+		if ( !result ) {
+			return false;
+		}
+	}
+
+	//
+	//	Create ReSTIR Reservoir
+	//
+	g_rtxGIReservoirBuffer.Allocate( device, NULL, width * height * sizeof( reservoir_t ), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
+
+	//
+	//	Create Lighting Buffer
+	//
+	Image::CreateParms_t imageParms;
+	imageParms.usageFlags = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+	imageParms.width = width;
+	imageParms.height = height;
+	imageParms.depth = 1;
+	imageParms.mipLevels = 1;
+	imageParms.format = VkFormat::VK_FORMAT_R16G16B16A16_SFLOAT;
+	for ( int i = 0; i < 3; i++ ) {
+		result = g_rtxGIRawImages[ i ].Create( device, imageParms );
+		if ( !result ) {
+			printf( "Unable to build rtx gi image!\n" );
+			assert( 0 );
+			return false;
+		}
+	}
+
+	for ( int i = 0; i < 3; i++ ) {
+		result = g_rtxGIAccumulatedImages[ i ].Create( device, imageParms );
+		if ( !result ) {
+			printf( "Unable to build rtx gi accumulated image!\n" );
+			assert( 0 );
+			return false;
+		}
+	}
+
+	for ( int i = 0; i < 3; i++ ) {
+		result = g_rtxGIImageDenoised[ i ].Create( device, imageParms );
+		if ( !result ) {
+			printf( "Unable to build rtx gi accumulated image!\n" );
+			assert( 0 );
+			return false;
+		}
+	}
+
+	for ( int i = 0; i < 3; i++ ) {
+		result = g_rtxGIAccumulatedImageHistory[ i ].Create( device, imageParms );
+		if ( !result ) {
+			printf( "Unable to build rtx gi accumulated history image!\n" );
+			assert( 0 );
+			return false;
+		}
+	}
+
+	result = g_rtxGIImageLumaA.Create( device, imageParms );
+	result = result && g_rtxGIImageLumaB.Create( device, imageParms );
+	if ( !result ) {
+		printf( "Unable to build rtx gi luma image!\n" );
+		assert( 0 );
+		return false;
+	}
+
+	result = g_rtxGIImageLumaHistory.Create( device, imageParms );
+	if ( !result ) {
+		printf( "Unable to build rtx gi luma history image!\n" );
+		assert( 0 );
+		return false;
+	}
+
+	imageParms.format = VkFormat::VK_FORMAT_R32_UINT;
+	result = g_rtxGIImageHistoryCounters[ 0 ].Create( device, imageParms );
+	result = result && g_rtxGIImageHistoryCounters[ 1 ].Create( device, imageParms );
+	if ( !result ) {
+		printf( "Unable to build rtx gi history image!\n" );
+		assert( 0 );
+		return false;
+	}
+	
+	return true;
+}
+
+
 /*
 ====================================================
 InitRaytracing
@@ -102,6 +353,11 @@ InitRaytracing
 bool InitRaytracing( DeviceContext * device, int width, int height ) {
 	bool result = false;
 #if defined( ENABLE_RAYTRACING )
+	result = InitGlobalIllumination( device, width, height );
+	if ( !result ) {
+		return false;
+	}
+
 	//
 	//	Monte Carlo Pipeline
 	//
@@ -150,7 +406,7 @@ bool InitRaytracing( DeviceContext * device, int width, int height ) {
 		memset( &descriptorParms, 0, sizeof( descriptorParms ) );
 		descriptorParms.type = Descriptors::TYPE_RAYTRACE;
 		descriptorParms.numAccelerationStructures = 1;
-		descriptorParms.numUniformsRayGen = 1;
+		//descriptorParms.numUniformsRayGen = 1;
 		descriptorParms.numStorageImagesRayGen = 4;
 		descriptorParms.numStorageBuffersRayGen = 2;
 		result = g_rtxImportanceSamplingDescriptors.Create( device, descriptorParms );
@@ -341,7 +597,7 @@ bool InitRaytracing( DeviceContext * device, int width, int height ) {
 		Descriptors::CreateParms_t descriptorParms;
 		memset( &descriptorParms, 0, sizeof( descriptorParms ) );
 		descriptorParms.type = Descriptors::TYPE_COMPUTE;
-		descriptorParms.numStorageImagesCompute = 4;
+		descriptorParms.numStorageImagesCompute = 7;
 		result = g_rtxApplyDiffuseDescriptors.Create( device, descriptorParms );
 		if ( !result ) {
 			return false;
@@ -488,6 +744,39 @@ void CleanupRaytracing( DeviceContext * device ) {
 	for ( int i = 0; i < 3; i++ ) {
 		g_gbufferHistory[ i ].Cleanup( device );
 	}
+
+	//
+	//	GI assets
+	//
+	g_rtxGIRaysPipeline.Cleanup( device );
+	g_rtxGIRaysDescriptors.Cleanup( device );
+
+	g_rtxGIAccumulatorPipeline.Cleanup( device );
+	g_rtxGIAccumulatorDescriptors.Cleanup( device );
+
+	g_rtxGIMomentsPipeline.Cleanup( device );
+	g_rtxGIMomentsDescriptors.Cleanup( device );
+
+	g_rtxGIWaveletPipeline.Cleanup( device );
+	g_rtxGIWaveletDescriptors.Cleanup( device );
+
+	g_rtxGIReservoirBuffer.Cleanup( device );
+
+	for ( int i = 0; i < 3; i++ ) {
+		g_rtxGIRawImages[ i ].Cleanup( device );
+		g_rtxGIAccumulatedImages[ i ].Cleanup( device );
+		g_rtxGIAccumulatedImageHistory[ i ].Cleanup( device );
+
+		g_rtxGIImageDenoised[ i ].Cleanup( device );
+	}
+
+	g_rtxGIImageHistoryCounters[ 0 ].Cleanup( device );
+	g_rtxGIImageHistoryCounters[ 1 ].Cleanup( device );
+
+	g_rtxGIImageLumaA.Cleanup( device );
+	g_rtxGIImageLumaB.Cleanup( device );
+	g_rtxGIImageLumaHistory.Cleanup( device );
+	
 #endif
 }
 
@@ -512,10 +801,253 @@ void UpdateRaytracing( DeviceContext * device, const RenderModel * models, int n
 
 /*
 ====================================================
+TraceGI
+Single bounce global illumination
+====================================================
+*/
+void TraceGI( DrawParms_t & parms ) {
+	DeviceContext * device = parms.device;
+	int cmdBufferIndex = parms.cmdBufferIndex;
+	Buffer * uniforms = parms.uniforms;
+	Buffer * orientRTX = parms.storageOrientsRTX;
+	VkCommandBuffer cmdBuffer = device->m_vkCommandBuffers[ cmdBufferIndex ];
+
+	const int camOffset = 0;
+	const int camSize = sizeof( float ) * 16 * 4;
+
+	g_rtxGIRawImages[ 0 ].TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_GENERAL );
+	g_rtxGIRawImages[ 1 ].TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_GENERAL );
+	g_rtxGIRawImages[ 2 ].TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_GENERAL );
+	g_rtxGIAccumulatedImages[ 0 ].TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_GENERAL );
+	g_rtxGIAccumulatedImages[ 1 ].TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_GENERAL );
+	g_rtxGIAccumulatedImages[ 2 ].TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_GENERAL );
+	g_rtxGIAccumulatedImageHistory[ 0 ].TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_GENERAL );
+	g_rtxGIAccumulatedImageHistory[ 1 ].TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_GENERAL );
+	g_rtxGIAccumulatedImageHistory[ 2 ].TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_GENERAL );
+	g_rtxGIImageDenoised[ 0 ].TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_GENERAL );
+	g_rtxGIImageDenoised[ 1 ].TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_GENERAL );
+	g_rtxGIImageDenoised[ 2 ].TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_GENERAL );
+	g_rtxGIImageHistoryCounters[ 0 ].TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_GENERAL );
+	g_rtxGIImageHistoryCounters[ 1 ].TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_GENERAL );
+	g_rtxGIImageLumaA.TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_GENERAL );
+	g_rtxGIImageLumaB.TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_GENERAL );
+	g_rtxGIImageLumaHistory.TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_GENERAL );
+
+	//
+	//	GI Ray Tracing
+	//
+	{
+		g_rtxGIRaysPipeline.BindPipelineRayTracing( cmdBuffer );
+		g_rtxGIRaysPipeline.BindPushConstant( cmdBuffer, 0, sizeof( g_numFrames ), &g_numFrames );
+
+		Descriptor descriptor = g_rtxGIRaysPipeline.GetRTXDescriptor();
+		descriptor.BindAccelerationStructure( &g_rtxAccelerationStructure, 0 );
+
+		descriptor.BindStorageImage( g_rtxGIRawImages[ 0 ], Samplers::m_samplerStandard, 1 );
+		descriptor.BindStorageImage( g_rtxGIRawImages[ 1 ], Samplers::m_samplerStandard, 2 );
+		descriptor.BindStorageImage( g_rtxGIRawImages[ 2 ], Samplers::m_samplerStandard, 3 );
+
+		descriptor.BindStorageImage( g_gbuffer.m_imageColor[ 0 ], Samplers::m_samplerStandard, 4 );
+		descriptor.BindStorageImage( g_gbuffer.m_imageColor[ 1 ], Samplers::m_samplerStandard, 5 );
+		descriptor.BindStorageImage( g_gbuffer.m_imageColor[ 2 ], Samplers::m_samplerStandard, 6 );
+
+		descriptor.BindStorageBuffer( &g_lightsStorageBuffer, 0, g_lightsStorageBuffer.m_vkBufferSize, 7 );
+		descriptor.BindStorageBuffer( &g_rtxGIReservoirBuffer, 0, g_rtxGIReservoirBuffer.m_vkBufferSize, 8 );
+
+		descriptor.BindRenderModelsRTX( parms.notCulledRenderModels, parms.numNotCulledRenderModels, 9, 10 );
+		descriptor.BindStorageBuffer( orientRTX, 0, orientRTX->m_vkBufferSize, 11 );
+
+		descriptor.BindDescriptor( device, cmdBuffer, &g_rtxGIRaysPipeline );
+		g_rtxGIRaysPipeline.TraceRays( cmdBuffer );
+	}
+
+	//
+	//	GI Accumulator
+	//
+	{
+		Image * imgHistoryCounterSrc = &g_rtxGIImageHistoryCounters[ ( g_numFrames + 0 ) & 1 ];
+		Image * imgHistoryCounterDst = &g_rtxGIImageHistoryCounters[ ( g_numFrames + 1 ) & 1 ];
+
+		g_rtxGIAccumulatorPipeline.BindPipelineCompute( cmdBuffer );
+
+		// Descriptor is how we bind our buffers and images
+		Descriptor descriptor = g_rtxGIAccumulatorPipeline.GetFreeDescriptor();
+		descriptor.BindStorageImage( g_rtxGIAccumulatedImages[ 0 ], Samplers::m_samplerStandard, 0 );	// red
+		descriptor.BindStorageImage( g_rtxGIAccumulatedImages[ 1 ], Samplers::m_samplerStandard, 1 );	// green
+		descriptor.BindStorageImage( g_rtxGIAccumulatedImages[ 2 ], Samplers::m_samplerStandard, 2 );	// blue
+		descriptor.BindStorageImage( g_rtxGIRawImages[ 0 ], Samplers::m_samplerStandard, 3 );	// red
+		descriptor.BindStorageImage( g_rtxGIRawImages[ 1 ], Samplers::m_samplerStandard, 4 );	// green
+		descriptor.BindStorageImage( g_rtxGIRawImages[ 2 ], Samplers::m_samplerStandard, 5 );	// blue
+		
+		descriptor.BindStorageImage( g_gbuffer.m_imageColor[ 0 ], Samplers::m_samplerStandard, 6 );
+		descriptor.BindStorageImage( g_gbuffer.m_imageColor[ 1 ], Samplers::m_samplerStandard, 7 );
+		descriptor.BindStorageImage( g_gbuffer.m_imageColor[ 2 ], Samplers::m_samplerStandard, 8 );
+		descriptor.BindStorageImage( g_gbufferHistory[ 0 ], Samplers::m_samplerStandard, 9 );
+		descriptor.BindStorageImage( g_gbufferHistory[ 1 ], Samplers::m_samplerStandard, 10 );
+		descriptor.BindStorageImage( g_gbufferHistory[ 2 ], Samplers::m_samplerStandard, 11 );
+
+		descriptor.BindStorageImage( g_taaVelocityBuffer.m_imageColor, Samplers::m_samplerStandard, 12 );
+
+		descriptor.BindStorageImage( g_rtxGIAccumulatedImageHistory[ 0 ], Samplers::m_samplerStandard, 13 );	// red
+		descriptor.BindStorageImage( g_rtxGIAccumulatedImageHistory[ 1 ], Samplers::m_samplerStandard, 14 );	// green
+		descriptor.BindStorageImage( g_rtxGIAccumulatedImageHistory[ 2 ], Samplers::m_samplerStandard, 15 );	// blue
+		descriptor.BindStorageImage( *imgHistoryCounterSrc, Samplers::m_samplerStandard, 16 );
+		descriptor.BindStorageImage( *imgHistoryCounterDst, Samplers::m_samplerStandard, 17 );
+		
+		descriptor.BindStorageImage( g_rtxGIImageLumaA, Samplers::m_samplerStandard, 18 );
+		descriptor.BindStorageImage( g_rtxGIImageLumaHistory, Samplers::m_samplerStandard, 19 );
+
+		descriptor.BindDescriptor( device, cmdBuffer, &g_rtxGIAccumulatorPipeline );
+		g_rtxGIAccumulatorPipeline.DispatchCompute( cmdBuffer, ( 1920 + 7 ) / 8, ( 1080 + 7 ) / 8, 1 );
+	}
+	g_rtxImageOut = &g_rtxGIAccumulatedImages[ 0 ];
+
+	MemoryBarriers::CreateImageMemoryBarrier( cmdBuffer, g_rtxGIAccumulatedImages[ 0 ], VK_IMAGE_ASPECT_COLOR_BIT );
+	MemoryBarriers::CreateImageMemoryBarrier( cmdBuffer, g_rtxGIAccumulatedImages[ 1 ], VK_IMAGE_ASPECT_COLOR_BIT );
+	MemoryBarriers::CreateImageMemoryBarrier( cmdBuffer, g_rtxGIAccumulatedImages[ 2 ], VK_IMAGE_ASPECT_COLOR_BIT );
+	int startIdx = 0;
+
+	//
+	//	GI Temporal Variance Filter
+	//
+	{
+		int i = 0;
+		Image * srcImages[ 3 ];
+		Image * dstImages[ 3 ];
+		srcImages[ 0 ] = ( ( i & 1 ) == 0 ) ? &g_rtxGIAccumulatedImages[ 0 ] : &g_rtxGIImageDenoised[ 0 ];
+		dstImages[ 0 ] = ( ( i & 1 ) == 0 ) ? &g_rtxGIImageDenoised[ 0 ] : &g_rtxGIAccumulatedImages[ 0 ];
+		srcImages[ 1 ] = ( ( i & 1 ) == 0 ) ? &g_rtxGIAccumulatedImages[ 1 ] : &g_rtxGIImageDenoised[ 1 ];
+		dstImages[ 1 ] = ( ( i & 1 ) == 0 ) ? &g_rtxGIImageDenoised[ 1 ] : &g_rtxGIAccumulatedImages[ 1 ];
+		srcImages[ 2 ] = ( ( i & 1 ) == 0 ) ? &g_rtxGIAccumulatedImages[ 2 ] : &g_rtxGIImageDenoised[ 2 ];
+		dstImages[ 2 ] = ( ( i & 1 ) == 0 ) ? &g_rtxGIImageDenoised[ 2 ] : &g_rtxGIAccumulatedImages[ 2 ];
+
+		Image * srcLuma = ( ( i & 1 ) == 0 ) ? &g_rtxGIImageLumaA : &g_rtxGIImageLumaB;
+		Image * dstLuma = ( ( i & 1 ) == 0 ) ? &g_rtxGIImageLumaB : &g_rtxGIImageLumaA;
+
+		// The source and destination history counters have swapped after the accumulator pass
+		Image * imgHistoryCounterSrc = &g_rtxGIImageHistoryCounters[ ( g_numFrames + 1 ) & 1 ];
+		Image * imgHistoryCounterDst = &g_rtxGIImageHistoryCounters[ ( g_numFrames + 0 ) & 1 ];
+
+		g_rtxGIMomentsPipeline.BindPipelineCompute( cmdBuffer );
+
+		// Descriptor is how we bind our buffers and images
+		Descriptor descriptor = g_rtxGIMomentsPipeline.GetFreeDescriptor();
+		descriptor.BindBuffer( uniforms, camOffset, camSize, 0 );
+
+		descriptor.BindStorageImage( *dstImages[ 0 ], Samplers::m_samplerStandard, 1 );
+		descriptor.BindStorageImage( *dstImages[ 1 ], Samplers::m_samplerStandard, 2 );
+		descriptor.BindStorageImage( *dstImages[ 2 ], Samplers::m_samplerStandard, 3 );
+		descriptor.BindStorageImage( *srcImages[ 0 ], Samplers::m_samplerStandard, 4 );
+		descriptor.BindStorageImage( *srcImages[ 1 ], Samplers::m_samplerStandard, 5 );
+		descriptor.BindStorageImage( *srcImages[ 2 ], Samplers::m_samplerStandard, 6 );
+		descriptor.BindStorageImage( g_gbuffer.m_imageColor[ 0 ], Samplers::m_samplerStandard, 7 );
+		descriptor.BindStorageImage( g_gbuffer.m_imageColor[ 1 ], Samplers::m_samplerStandard, 8 );
+		descriptor.BindStorageImage( g_gbuffer.m_imageColor[ 2 ], Samplers::m_samplerStandard, 9 );
+
+		descriptor.BindStorageImage( *srcLuma, Samplers::m_samplerStandard, 10 );
+		descriptor.BindStorageImage( *dstLuma, Samplers::m_samplerStandard, 11 );
+
+		descriptor.BindStorageImage( *imgHistoryCounterSrc, Samplers::m_samplerStandard, 12 );
+
+		descriptor.BindDescriptor( device, cmdBuffer, &g_rtxGIMomentsPipeline );
+		g_rtxGIMomentsPipeline.DispatchCompute( cmdBuffer, ( 1920 + 7 ) / 8, ( 1080 + 7 ) / 8, 1 );
+
+		MemoryBarriers::CreateImageMemoryBarrier( cmdBuffer, *dstImages[ 0 ], VK_IMAGE_ASPECT_COLOR_BIT );
+		MemoryBarriers::CreateImageMemoryBarrier( cmdBuffer, *dstImages[ 1 ], VK_IMAGE_ASPECT_COLOR_BIT );
+		MemoryBarriers::CreateImageMemoryBarrier( cmdBuffer, *dstImages[ 2 ], VK_IMAGE_ASPECT_COLOR_BIT );
+
+		g_rtxImageOut = dstImages[ 0 ];
+		startIdx = 1;
+
+		// Copy the first temporal filtered image into the history buffer
+		for ( int i = 0; i < 3; i++ ) {
+			dstImages[ i ]->TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL );
+			g_rtxGIAccumulatedImageHistory[ i ].TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL );
+
+			Image::CopyImage( g_rtxGIAccumulatedImageHistory[ i ], *dstImages[ i ], cmdBuffer );
+
+			dstImages[ i ]->TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_GENERAL );
+			g_rtxGIAccumulatedImageHistory[ i ].TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_GENERAL );
+		}
+
+		// Copy the luma image into the luma history buffer
+		{
+			dstLuma->TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL );
+			g_rtxGIImageLumaHistory.TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL );
+
+			Image::CopyImage( g_rtxGIImageLumaHistory, *dstLuma, cmdBuffer );
+
+			dstLuma->TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_GENERAL );
+			g_rtxGIImageLumaHistory.TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_GENERAL );
+		}
+	}
+
+	//
+	//	GI Wavelet Filter
+	//
+	for ( int i = startIdx; i < 5 + startIdx; i++ ) {
+		int inters[4];
+		inters[ 0 ] = i;
+		inters[ 1 ] = i;
+		inters[ 2 ] = i;
+		inters[ 3 ] = i;
+
+		Image * srcImages[ 3 ];
+		Image * dstImages[ 3 ];
+		srcImages[ 0 ] = ( ( i & 1 ) == 0 ) ? &g_rtxGIAccumulatedImages[ 0 ] : &g_rtxGIImageDenoised[ 0 ];
+		dstImages[ 0 ] = ( ( i & 1 ) == 0 ) ? &g_rtxGIImageDenoised[ 0 ] : &g_rtxGIAccumulatedImages[ 0 ];
+		srcImages[ 1 ] = ( ( i & 1 ) == 0 ) ? &g_rtxGIAccumulatedImages[ 1 ] : &g_rtxGIImageDenoised[ 1 ];
+		dstImages[ 1 ] = ( ( i & 1 ) == 0 ) ? &g_rtxGIImageDenoised[ 1 ] : &g_rtxGIAccumulatedImages[ 1 ];
+		srcImages[ 2 ] = ( ( i & 1 ) == 0 ) ? &g_rtxGIAccumulatedImages[ 2 ] : &g_rtxGIImageDenoised[ 2 ];
+		dstImages[ 2 ] = ( ( i & 1 ) == 0 ) ? &g_rtxGIImageDenoised[ 2 ] : &g_rtxGIAccumulatedImages[ 2 ];
+
+// 		Image * srcImage = ( ( i & 1 ) == 0 ) ? &g_rtxGIImageAccumulated : &g_rtxGIImageDenoised;
+// 		Image * dstImage = ( ( i & 1 ) == 0 ) ? &g_rtxGIImageDenoised : &g_rtxGIImageAccumulated;
+
+		Image * srcLuma = ( ( i & 1 ) == 0 ) ? &g_rtxGIImageLumaA : &g_rtxGIImageLumaB;
+		Image * dstLuma = ( ( i & 1 ) == 0 ) ? &g_rtxGIImageLumaB : &g_rtxGIImageLumaA;
+
+		g_rtxGIWaveletPipeline.BindPipelineCompute( cmdBuffer );
+		g_rtxGIWaveletPipeline.BindPushConstant( cmdBuffer, 0, sizeof( int ) * 4, inters );
+
+		// Descriptor is how we bind our buffers and images
+		Descriptor descriptor = g_rtxGIWaveletPipeline.GetFreeDescriptor();
+		descriptor.BindBuffer( uniforms, camOffset, camSize, 0 );
+
+		descriptor.BindStorageImage( *dstImages[ 0 ], Samplers::m_samplerStandard, 1 );
+		descriptor.BindStorageImage( *dstImages[ 1 ], Samplers::m_samplerStandard, 2 );
+		descriptor.BindStorageImage( *dstImages[ 2 ], Samplers::m_samplerStandard, 3 );
+		descriptor.BindStorageImage( *srcImages[ 0 ], Samplers::m_samplerStandard, 4 );
+		descriptor.BindStorageImage( *srcImages[ 1 ], Samplers::m_samplerStandard, 5 );
+		descriptor.BindStorageImage( *srcImages[ 2 ], Samplers::m_samplerStandard, 6 );
+		descriptor.BindStorageImage( g_gbuffer.m_imageColor[ 0 ], Samplers::m_samplerStandard, 7 );
+		descriptor.BindStorageImage( g_gbuffer.m_imageColor[ 1 ], Samplers::m_samplerStandard, 8 );
+		descriptor.BindStorageImage( g_gbuffer.m_imageColor[ 2 ], Samplers::m_samplerStandard, 9 );
+
+		descriptor.BindStorageImage( *srcLuma, Samplers::m_samplerStandard, 10 );
+		descriptor.BindStorageImage( *dstLuma, Samplers::m_samplerStandard, 11 );
+
+		descriptor.BindDescriptor( device, cmdBuffer, &g_rtxGIWaveletPipeline );
+		g_rtxGIWaveletPipeline.DispatchCompute( cmdBuffer, ( 1920 + 7 ) / 8, ( 1080 + 7 ) / 8, 1 );
+
+		MemoryBarriers::CreateImageMemoryBarrier( cmdBuffer, *dstImages[ 0 ], VK_IMAGE_ASPECT_COLOR_BIT );
+		MemoryBarriers::CreateImageMemoryBarrier( cmdBuffer, *dstImages[ 1 ], VK_IMAGE_ASPECT_COLOR_BIT );
+		MemoryBarriers::CreateImageMemoryBarrier( cmdBuffer, *dstImages[ 2 ], VK_IMAGE_ASPECT_COLOR_BIT );
+
+		g_rtxImageOut = dstImages[ 0 ];
+		//g_rtxImageOut = dstLuma;
+
+		g_rtxGIImageOut[ 0 ] = dstImages[ 0 ];
+		g_rtxGIImageOut[ 1 ] = dstImages[ 1 ];
+		g_rtxGIImageOut[ 2 ] = dstImages[ 2 ];
+	}
+}
+
+/*
+====================================================
 DrawRaytracing
 ====================================================
 */
-static int g_numFrames = 0;
 void DrawRaytracing( DrawParms_t & parms ) {
 #if defined( ENABLE_RAYTRACING )
 	DeviceContext * device = parms.device;
@@ -550,6 +1082,8 @@ void DrawRaytracing( DrawParms_t & parms ) {
 	g_rtxImageLumaA.TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_GENERAL );
 	g_rtxImageLumaB.TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_GENERAL );
 	g_rtxImageLumaHistory.TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_GENERAL );
+
+	TraceGI( parms );
 
 	//
 	//	Ray Tracing
@@ -829,10 +1363,16 @@ void DrawRaytracing( DrawParms_t & parms ) {
 		descriptor.BindStorageImage( g_gbuffer.m_imageColor[ 1 ], Samplers::m_samplerStandard, 2 );
 		descriptor.BindStorageImage( g_gbuffer.m_imageColor[ 2 ], Samplers::m_samplerStandard, 3 );
 
+		descriptor.BindStorageImage( *g_rtxGIImageOut[ 0 ], Samplers::m_samplerStandard, 4 );
+		descriptor.BindStorageImage( *g_rtxGIImageOut[ 1 ], Samplers::m_samplerStandard, 5 );
+		descriptor.BindStorageImage( *g_rtxGIImageOut[ 2 ], Samplers::m_samplerStandard, 6 );
+
 		descriptor.BindDescriptor( device, cmdBuffer, &g_rtxApplyDiffusePipeline );
 		g_rtxApplyDiffusePipeline.DispatchCompute( cmdBuffer, ( 1920 + 7 ) / 8, ( 1080 + 7 ) / 8, 1 );
 	}
 #endif
+
+	//g_rtxImageOut = &g_rtxImage;
 
 	//
 	//	Copy the gbuffer into the history gbuffer
@@ -846,6 +1386,5 @@ void DrawRaytracing( DrawParms_t & parms ) {
  		g_gbuffer.m_imageColor[ i ].TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_GENERAL );
  		g_gbufferHistory[ i ].TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_GENERAL );
 	}
-
 #endif
 }

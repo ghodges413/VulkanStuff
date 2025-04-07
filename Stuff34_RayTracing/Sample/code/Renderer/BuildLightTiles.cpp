@@ -134,7 +134,7 @@ bool InitLightTiles( DeviceContext * device, int width, int height, brush_t * br
 	storageLight_t * storageLights = (storageLight_t *)g_lightsStorageBuffer.MapBuffer( device );
 	for ( int i = 0; i < maxLights; i++ ) {
 		storageLight_t & light = storageLights[ i ];
-		light.m_color = Vec4( 1, 1, 1, 1 );
+		light.m_color = Vec4( 1, 1, 0, 1 );
 
 		int colorID = i & 3;
 		if ( 0 == colorID ) {

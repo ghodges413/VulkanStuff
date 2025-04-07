@@ -73,8 +73,10 @@ Targa::Targa() :
 m_width( 0 ),
 m_height( 0 ),
 m_bitsPerPixel( 0 ),
+m_mips( 1 ),
 m_ordering( TARGA_ORDER_NONE ),
-m_data_ptr( NULL ) {
+m_data_ptr( NULL ),
+m_dataMipsPtr( NULL ) {
 }
 
 /*
@@ -87,6 +89,9 @@ Targa::~Targa() {
         delete[] m_data_ptr;
         m_data_ptr = NULL;
     }
+
+    free( m_dataMipsPtr );
+    m_dataMipsPtr = NULL;
 }
 
 /*
@@ -370,4 +375,75 @@ bool Targa::Load( const char * fileName, const bool verbose /* = false */ ) {
 	m_bitsPerPixel = 32;
 	delete[] pixelData;
 	return true;
+}
+
+/*
+ ===============================
+ Targa::GenerateMips
+ ===============================
+ */
+void Targa::GenerateMips() {
+    int maxPixels = m_width * m_height * 4 * 2; // it converges to 1.5, but we're using 2 out of laziness
+    m_dataMipsPtr = (unsigned char *)malloc( maxPixels );
+    memset( m_dataMipsPtr, 0, maxPixels );
+
+    memcpy( m_dataMipsPtr, m_data_ptr, m_width * m_height * 4 );
+
+    unsigned char * src_ptr = m_dataMipsPtr;
+    unsigned char * dst_ptr = m_dataMipsPtr + m_width * m_height * 4;
+
+    int numMips = 1;
+
+    int srcW = m_width;
+    int srcH = m_height;
+    while ( srcW > 16 && srcH > 16 ) {
+        const int dstW = srcW >> 1;
+        const int dstH = srcH >> 1;
+
+        for ( int y = 0; y < dstH; y++ ) {
+            for ( int x = 0; x < dstW; x++ ) {
+                int srcIdx[ 4 ];
+                srcIdx[ 0 ] = ( 2 * x + 0 ) + ( 2 * y + 0 ) * srcW;
+                srcIdx[ 1 ] = ( 2 * x + 1 ) + ( 2 * y + 0 ) * srcW;
+                srcIdx[ 2 ] = ( 2 * x + 1 ) + ( 2 * y + 1 ) * srcW;
+                srcIdx[ 3 ] = ( 2 * x + 0 ) + ( 2 * y + 1 ) * srcW;
+
+                unsigned int colors[ 4 ] = { 0 };
+                for ( int i = 0; i < 4; i++ ) {
+                    int src = srcIdx[ i ];
+
+                    colors[ 0 ] += src_ptr[ src * 4 + 0 ];
+                    colors[ 1 ] += src_ptr[ src * 4 + 1 ];
+                    colors[ 2 ] += src_ptr[ src * 4 + 2 ];
+                    colors[ 3 ] += src_ptr[ src * 4 + 3 ];
+                }
+
+                colors[ 0 ] /= 4;
+                colors[ 1 ] /= 4;
+                colors[ 2 ] /= 4;
+                colors[ 3 ] /= 4;
+
+//                 colors[ 0 ] = 255;
+//                 colors[ 1 ] = 0;
+//                 colors[ 2 ] = 255;
+//                 colors[ 3 ] = 255;
+
+                const int dstIdx = x + y * dstW;
+                dst_ptr[ dstIdx * 4 + 0 ] = colors[ 0 ];
+                dst_ptr[ dstIdx * 4 + 1 ] = colors[ 1 ];
+                dst_ptr[ dstIdx * 4 + 2 ] = colors[ 2 ];
+                dst_ptr[ dstIdx * 4 + 3 ] = colors[ 3 ];
+            }
+        }
+
+        src_ptr = dst_ptr;
+        dst_ptr = dst_ptr + dstW * dstH * 4;
+
+        srcW >>= 1;
+        srcH >>= 1;
+
+        numMips++;
+    }
+
+    m_mips = numMips;
 }

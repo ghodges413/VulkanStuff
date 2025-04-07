@@ -3,6 +3,7 @@
 //
 #pragma once
 #include <vulkan/vulkan.h>
+#include <vector>
 
 class DeviceContext;
 class Texture;
@@ -27,7 +28,7 @@ public:
 
 	void BindBuffer( Buffer * uniformBuffer, int offset, int size, int slot );
 	void BindStorageBuffer( Buffer * storageBuffer, int offset, int size, int slot );
-
+	void BindRenderModelsRTX( RenderModel * models, int num, int slotVertices, int slotIndices );
 	void BindAccelerationStructure( AccelerationStructure * accelerationStructure, int slot );
 
 	void UpdateDescriptor( DeviceContext * device );
@@ -39,6 +40,8 @@ public:
 	// Sometimes we need to specify a special imageView in order to access a particular subresource of an image, such as a specific mip level
 	void BindImage( VkImageLayout imageLayout, VkImageView imageView, VkSampler sampler, int slot );
 	void BindStorageImage( VkImageLayout imageLayout, VkImageView imageView, VkSampler sampler, int slot );
+
+	
 
 private:
 	Descriptors * m_parent;
@@ -57,7 +60,7 @@ private:
 	int m_imageSlots[ MAX_IMAGEINFO ];
 
 	int m_numStorageImages;
-	static const int MAX_STORAGEIMAGEINFO = 16;
+	static const int MAX_STORAGEIMAGEINFO = 24;
 	VkDescriptorImageInfo m_storageImageInfo[ MAX_STORAGEIMAGEINFO ];
 	int m_storageImageSlots[ MAX_STORAGEIMAGEINFO ];
 
@@ -65,6 +68,12 @@ private:
 	static const int MAX_STORAGEBUFFERINFO = 16;
 	VkDescriptorBufferInfo m_storageBufferInfo[ MAX_STORAGEBUFFERINFO ];
 	int m_storageBufferSlots[ MAX_STORAGEBUFFERINFO ];
+
+	// These are actually storage buffers, but lots of separate ones, so we need to do it special
+	std::vector< VkDescriptorBufferInfo > m_rtxVertexDescriptors;
+	int m_rtxVertexDescriptorsSlot;
+	std::vector< VkDescriptorBufferInfo > m_rtxIndexDescriptors;
+	int m_rtxIndexDescriptorsSlot;
 
 	int m_numAccelerationStructure;
 	static const int MAX_ACCELERATIONSTRUCTURES = 16;
@@ -120,7 +129,8 @@ public:
 		int numUniformsRayGen;
 		int numStorageImagesRayGen;
 		int numStorageBuffersRayGen;
-		int numStorageBuffersClosestHit;		
+		int numStorageBuffersClosestHit;
+		int numStorageBuffersClosestHitArraySize;
 	};
 
 	bool Create( DeviceContext * device, const CreateParms_t & parms );

@@ -1,0 +1,272 @@
+#version 450
+// This denoiser is based on the paper: https://research.nvidia.com/publication/2017-07_spatiotemporal-variance-guided-filtering-real-time-reconstruction-path-traced
+// Spatiotemporal Variance-Guided Filtering: Real-Time Reconstruction for Path-Traced Global Illumination
+
+#define WORK_GROUP_SIZE 8
+layout ( local_size_x = WORK_GROUP_SIZE, local_size_y = WORK_GROUP_SIZE, local_size_z = 1 ) in;
+
+layout( binding = 0 ) uniform uboCamera {
+    mat4 view;
+    mat4 proj;
+} camera;
+
+layout( binding = 1 ) uniform writeonly image2D imageDestRed;	// The buffer that will be filtered
+layout( binding = 2 ) uniform writeonly image2D imageDestGreen;	// The buffer that will be filtered
+layout( binding = 3 ) uniform writeonly image2D imageDestBlue;	// The buffer that will be filtered
+
+layout( binding = 4, rgba16f ) uniform readonly image2D imageSourceRed;		// The accumulated color buffer
+layout( binding = 5, rgba16f ) uniform readonly image2D imageSourceGreen;	// The accumulated color buffer
+layout( binding = 6, rgba16f ) uniform readonly image2D imageSourceBlue;	// The accumulated color buffer
+
+layout( binding = 7, rgba32f ) uniform readonly image2D imageGBuffer0;
+layout( binding = 8, rgba16f ) uniform readonly image2D imageGBuffer1;
+layout( binding = 9, rgba16f ) uniform readonly image2D imageGBuffer2;
+
+layout( binding = 10, rgba16f ) uniform readonly image2D imageLumaSrc;
+layout( binding = 11, rgba16f ) uniform writeonly image2D imageLumaDst;
+
+layout( binding = 12, r32ui ) uniform readonly uimage2D imageHistoryCounter;	// read write history counter
+
+
+// These are hard coded values that the authors of the SVGF paper found worked
+const float sigmaZ = 1;
+const float sigmaN = 128;
+const float sigmaL = 4;
+
+const float epsilonZ = 0.001;
+const float epsilonL = 0.001;
+
+float gradP = 0;
+
+/*
+==========================
+FilterWeightPos
+==========================
+*/
+float FilterWeightPos( in float pDepth, in vec3 qPos ) {
+	vec4 qPosProj = camera.proj * camera.view * vec4( qPos.xyz, 1.0 );
+	float qDepth = qPosProj.z / qPosProj.w;
+
+	float gradZp = gradP;
+	float numerator = abs( pDepth - qDepth );
+	float denominator = sigmaZ * abs( gradZp * ( pDepth - qDepth ) ) + epsilonZ;
+	return exp( -numerator / denominator );
+}
+
+/*
+==========================
+FilterWeightNorm
+==========================
+*/
+float FilterWeightNorm( in vec3 pNorm, in vec3 qNorm ) {
+	return pow( max( 0.0, dot( pNorm, qNorm ) ), sigmaN );
+}
+
+/*
+==========================
+FilterWeightLuminance
+==========================
+*/
+float FilterWeightLuminance( in vec3 pColor, in vec3 qColor, in vec4 luma ) {
+	float pLum = dot( vec3( 0.2126, 0.7152, 0.0722 ), pColor.rgb );
+	float qLum = dot( vec3( 0.2126, 0.7152, 0.0722 ), qColor.rgb );
+
+	//float varianceSqr = pColor.a;	// Stored from the accumulator shader
+	float varianceSqr = abs( luma.z );
+	float numerator = abs( pLum - qLum );
+	float denominator = sigmaL * sqrt( varianceSqr ) + epsilonL;
+	//return exp( -numerator / denominator );
+	return 1;
+}
+
+/*
+==========================
+FilterWeightLuminance2
+==========================
+*/
+float FilterWeightLuminance2( in vec3 pColor, in vec3 qColor, in float varSqr ) {
+	float pLum = dot( vec3( 0.2126, 0.7152, 0.0722 ), pColor.rgb );
+	float qLum = dot( vec3( 0.2126, 0.7152, 0.0722 ), qColor.rgb );
+
+	//const float sigmaColor = 10.0;
+	//const float epsilonVar = 1e-10;
+	//float denominator = sigmaColor * sqrt( max( 0.0, epsilonVar + varSqr ) );
+	//float denominator = sigmaColor * sqrt( max( 0.0, varSqr ) ) + epsilonVar;
+	//float denominator = sigmaL * sqrt( max( 0.0, varSqr ) ) + epsilonL;
+	float denominator = sigmaL * sqrt( abs( varSqr ) ) + epsilonL;
+
+	const float weight = abs( pLum - qLum ) / denominator;
+	return exp( -weight );
+	//return 1;
+}
+
+vec3 ColorFromSH( in vec4 shRed, in vec4 shGreen, in vec4 shBlue, in vec3 dir ) {
+	const float c1 = 0.429043;
+    const float c2 = 0.511664;
+    const float c3 = 0.743125;
+    const float c4 = 0.886227;
+    const float c5 = 0.247708;
+
+	// Convert to spherical harmonic components
+    vec3 ylm00 = vec3( shRed.x, shGreen.x, shBlue.x );
+    vec3 ylm11 = vec3( shRed.y, shGreen.y, shBlue.y );
+    vec3 ylm10 = vec3( shRed.z, shGreen.z, shBlue.z );
+    vec3 ylm1n1 = vec3( shRed.w, shGreen.w, shBlue.w );
+
+    vec3 color = ylm00 * c4 + ( ylm11 * dir.x + ylm1n1 * dir.y + ylm10 * dir.z ) * 2.0 * c2;
+    return color;
+}
+
+/*
+==========================
+main
+==========================
+*/
+void main() {
+	ivec2 st = ivec2( gl_GlobalInvocationID.xy );
+	if ( st.x >= 1920 || st.y >= 1080 ) {
+		return;
+	}
+
+	// If the number of history samples is less than 4, then simply pass the color without any filtering
+	uint numHistory = imageLoad( imageHistoryCounter, st ).r;
+	if ( numHistory < 4 ) {
+		vec4 srcColorR = imageLoad( imageSourceRed, st );
+		vec4 srcColorG = imageLoad( imageSourceGreen, st );
+		vec4 srcColorB = imageLoad( imageSourceBlue, st );
+		imageStore( imageDestRed, st, srcColorR );
+		imageStore( imageDestGreen, st, srcColorG );
+		imageStore( imageDestBlue, st, srcColorB );
+
+		vec4 srcMoments = imageLoad( imageLumaSrc, st );
+		imageStore( imageLumaDst, st, srcMoments );
+		return;
+	}
+
+	vec4 gbuffer0 = imageLoad( imageGBuffer0, st );
+    vec4 gbuffer1 = imageLoad( imageGBuffer1, st );
+    vec4 gbuffer2 = imageLoad( imageGBuffer2, st );
+
+	vec3 worldPos = gbuffer0.xyz;
+    vec3 diffuse = gbuffer1.rgb;
+    vec3 normal = gbuffer2.xyz;
+
+	float roughness = gbuffer0.a;
+    float metalness = gbuffer1.a;
+
+    if ( 0 == gbuffer2.a ) {
+		imageStore( imageDestRed, st, vec4( 0 ) );
+		imageStore( imageDestGreen, st, vec4( 0 ) );
+		imageStore( imageDestBlue, st, vec4( 0 ) );
+		return;
+    }
+
+	//
+	//	Calculate the gradient of the depth
+	//
+	float pDepth = 0;
+	{
+		vec4 posPX = imageLoad( imageGBuffer0, st + ivec2( 1, 0 ) );
+		vec4 posPY = imageLoad( imageGBuffer0, st + ivec2( 0, 1 ) );
+		vec4 posNX = imageLoad( imageGBuffer0, st + ivec2(-1, 0 ) );
+		vec4 posNY = imageLoad( imageGBuffer0, st + ivec2( 0,-1 ) );
+
+		posPX = camera.proj * camera.view * vec4( posPX.xyz, 1.0 );
+		posPY = camera.proj * camera.view * vec4( posPY.xyz, 1.0 );
+		posNX = camera.proj * camera.view * vec4( posNX.xyz, 1.0 );
+		posNY = camera.proj * camera.view * vec4( posNY.xyz, 1.0 );
+
+		posPX /= posPX.w;
+		posPY /= posPY.w;
+		posNX /= posNX.w;
+		posNY /= posNY.w;
+
+		vec4 projPos = camera.proj * camera.view * vec4( worldPos.xyz, 1.0 );
+		projPos /= projPos.w;
+		pDepth = projPos.z;
+
+		float dDepthX = ( posPX.z - posNX.z ) * 0.5 / projPos.z;	// We divied by projPos.z to "normalize" the depth
+		float dDepthY = ( posPY.z - posNY.z ) * 0.5 / projPos.z;
+
+		// TODO: Both of these are tried in real world code, but experiment and see what works for us
+		gradP = sqrt( dDepthX * dDepthX + dDepthY * dDepthY );
+		gradP = max( abs( dDepthX ), abs( dDepthY ) );
+	}
+
+	vec3 pNorm = normal;
+	vec4 pColorRed = imageLoad( imageSourceRed, st );
+	vec4 pColorGreen = imageLoad( imageSourceGreen, st );
+	vec4 pColorBlue = imageLoad( imageSourceBlue, st );
+	vec3 pColor = ColorFromSH( pColorRed, pColorGreen, pColorBlue, pNorm ); // Convert the SH to color
+
+	// compute first and second moment spatially. This code also applies cross-bilateral
+	// filtering on the input illumination.
+	float sumW = 0;
+	vec4 sumColorRedSH = vec4( 0 );
+	vec4 sumColorGreenSH = vec4( 0 );
+	vec4 sumColorBlueSH = vec4( 0 );
+	vec4 sumMoments = vec4( 0 );
+	const int radius = 3;	// 7x7 filter
+	for ( int yy = -radius; yy <= radius; yy++ ) {
+		for ( int xx = -radius; xx <= radius; xx++ ) {
+			ivec2 stq = st + ivec2( xx, yy );
+			if ( stq.x < 0 || stq.y < 0 || stq.x >= 1920 || stq.y >= 1080 ) {
+				continue;
+			}
+
+			vec3 qPos = imageLoad( imageGBuffer0, stq ).xyz;
+			vec3 qNorm = imageLoad( imageGBuffer2, stq ).xyz;
+
+			// Get the spherical harmonic components
+			vec4 qColorRed = imageLoad( imageSourceRed, stq );
+			vec4 qColorGreen = imageLoad( imageSourceRed, stq );
+			vec4 qColorBlue = imageLoad( imageSourceRed, stq );
+
+			// Convert the SH to color
+			vec3 qColor = ColorFromSH( qColorRed, qColorGreen, qColorBlue, qNorm );
+			
+			float qLuma = dot( vec3( 0.2126, 0.7152, 0.0722 ), qColor.rgb );
+
+			vec4 qMoments = imageLoad( imageLumaSrc, stq );
+			float varSqr = qMoments.a;
+
+			float wZ = FilterWeightPos( pDepth, qPos );
+			float wN = FilterWeightNorm( pNorm, qNorm );
+			float wL = FilterWeightLuminance( pColor, qColor, vec4( qLuma ) );
+			//float wL = FilterWeightLuminance2( pColor, qColor, varSqr );
+			float wpq = wZ * wN * wL;
+
+			sumW += wpq;
+			sumColorRedSH += qColorRed * wpq;
+			sumColorGreenSH += qColorGreen * wpq;
+			sumColorBlueSH += qColorBlue * wpq;
+			sumMoments += qMoments * wpq;
+		}
+	}
+
+	// Clamp sum to >0 to avoid NaNs.
+	sumW = max( sumW, 1e-6f );
+
+	sumColorRedSH /= sumW;
+	sumColorGreenSH /= sumW;
+	sumColorBlueSH /= sumW;
+	sumMoments /= sumW;
+
+	// compute variance using the first and second moments
+	float variance = sumMoments.g - sumMoments.r * sumMoments.r;
+
+	// give the variance a boost for the first frames
+	variance *= 4.0 / float( numHistory );
+
+	//return vec4(sumIllumination, variance.r);
+
+	// Average the luma's and calculate the variance
+	//momentSum /= wSum;
+	float lumaVariance = variance;//momentSum.g - momentSum.r * momentSum.r;
+	imageStore( imageLumaDst, st, vec4( sumMoments.x, sumMoments.y, lumaVariance, lumaVariance ) );
+
+	//vec3 color = numerator / denominator;
+	imageStore( imageDestRed, st, sumColorRedSH );
+	imageStore( imageDestGreen, st, sumColorGreenSH );
+	imageStore( imageDestBlue, st, sumColorBlueSH );
+}

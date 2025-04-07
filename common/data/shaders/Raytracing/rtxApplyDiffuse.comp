@@ -9,6 +9,28 @@ layout( binding = 1, rgba32f ) uniform readonly image2D imageGBuffer0;
 layout( binding = 2, rgba16f ) uniform readonly image2D imageGBuffer1;
 layout( binding = 3, rgba16f ) uniform readonly image2D imageGBuffer2;
 
+layout( binding = 4, rgba16f ) uniform readonly image2D imageSHRed;
+layout( binding = 5, rgba16f ) uniform readonly image2D imageSHGreen;
+layout( binding = 6, rgba16f ) uniform readonly image2D imageSHBlue;
+
+
+vec3 ColorFromSH( in vec4 shRed, in vec4 shGreen, in vec4 shBlue, in vec3 dir ) {
+	const float c1 = 0.429043;
+    const float c2 = 0.511664;
+    const float c3 = 0.743125;
+    const float c4 = 0.886227;
+    const float c5 = 0.247708;
+
+	// Convert to spherical harmonic components
+    vec3 ylm00 = vec3( shRed.x, shGreen.x, shBlue.x );
+    vec3 ylm11 = vec3( shRed.y, shGreen.y, shBlue.y );
+    vec3 ylm10 = vec3( shRed.z, shGreen.z, shBlue.z );
+    vec3 ylm1n1 = vec3( shRed.w, shGreen.w, shBlue.w );
+
+    vec3 color = ylm00 * c4 + ( ylm11 * dir.x + ylm1n1 * dir.y + ylm10 * dir.z ) * 2.0 * c2;
+    return color;
+}
+
 /*
  ==========================
  main
@@ -36,7 +58,15 @@ void main() {
 		return;
     }
 
+	// Calculate the global illumination (bounced light)
+	vec4 shRed = imageLoad( imageSHRed, st );
+	vec4 shGreen = imageLoad( imageSHGreen, st );
+	vec4 shBlue = imageLoad( imageSHBlue, st );
+	vec3 bouncedLight = ColorFromSH( shRed, shGreen, shBlue, normal );
+
 	vec3 lighting = imageLoad( imageDest, st ).rgb;
+	lighting += bouncedLight;
+
 	vec3 finalColor = lighting * diffuse;
 	imageStore( imageDest, st, vec4( finalColor, 1.0 ) );
 }

@@ -40,6 +40,7 @@ struct DrawParms_t {
 	Buffer * uniforms;
 	Buffer * uniformsOld;
 	Buffer * uniformsModelIDs;
+	Buffer * storageOrientsRTX;
 	RenderModel * renderModels;
 	int numModels;
 	RenderModel * notCulledRenderModels;

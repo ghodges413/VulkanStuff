@@ -96,7 +96,11 @@ Buffer::MapBuffer
 void * Buffer::MapBuffer( DeviceContext * device ) {
 	void * mapped_ptr = NULL;
 	uint32_t byteOffset = 0;
-	vkMapMemory( device->m_vkDevice, m_vkBufferMemory, byteOffset, m_vkBufferSize, 0, &mapped_ptr );
+	VkResult result = vkMapMemory( device->m_vkDevice, m_vkBufferMemory, byteOffset, m_vkBufferSize, 0, &mapped_ptr );
+	if ( VK_SUCCESS != result ) {
+		return NULL;
+	}
+
 	return mapped_ptr;
 }
 

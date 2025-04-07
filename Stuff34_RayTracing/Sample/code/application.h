@@ -89,6 +89,8 @@ private:
 	Buffer m_uniformBuffer[ 2 ];
 	Buffer m_unformModelIDs;
 
+	Buffer m_storageBufferOrientsRTX;	// The orientation matrices in a storage buffer for the GI rtx pass
+
 	//
 	//	Descriptor Sets
 	//

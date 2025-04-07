@@ -137,6 +137,12 @@ bool InitGBuffer( DeviceContext * device, int width, int height ) {
 		targaNormals.Load( "../../common/data/images/block_1x1/block_a_normal.tga" );
 		targaRoughness.Load( "../../common/data/images/block_1x1/block_a_rough.tga" );
 		targaSpecular.Load( "../../common/data/images/block_1x1/block_a_metal.tga" );
+		targaDiffuse.GenerateMips();
+		targaNormals.GenerateMips();
+		targaRoughness.GenerateMips();
+		targaSpecular.GenerateMips();
+
+		// TODO: Add support for block compression (this should give us a performance boost)
 
 		Image::CreateParms_t imageParms;
 		imageParms.depth = 1;
@@ -146,21 +152,25 @@ bool InitGBuffer( DeviceContext * device, int width, int height ) {
 
 		imageParms.width = targaDiffuse.GetWidth();
 		imageParms.height = targaDiffuse.GetHeight();
+		imageParms.mipLevels = targaDiffuse.GetMips();
 		g_imageDiffuse.Create( device, imageParms );
 		g_imageDiffuse.UploadData( device, targaDiffuse.DataPtr() );
 
 		imageParms.width = targaNormals.GetWidth();
 		imageParms.height = targaNormals.GetHeight();
+		imageParms.mipLevels = targaNormals.GetMips();
 		g_imageNormals.Create( device, imageParms );
 		g_imageNormals.UploadData( device, targaNormals.DataPtr() );
 
 		imageParms.width = targaRoughness.GetWidth();
 		imageParms.height = targaRoughness.GetHeight();
+		imageParms.mipLevels = targaRoughness.GetMips();
 		g_imageRoughness.Create( device, imageParms );
 		g_imageRoughness.UploadData( device, targaRoughness.DataPtr() );
 
 		imageParms.width = targaSpecular.GetWidth();
 		imageParms.height = targaSpecular.GetHeight();
+		imageParms.mipLevels = targaSpecular.GetMips();
 		g_imageSpecular.Create( device, imageParms );
 		g_imageSpecular.UploadData( device, targaSpecular.DataPtr() );
 	}

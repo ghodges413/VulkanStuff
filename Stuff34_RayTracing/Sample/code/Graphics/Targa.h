@@ -23,12 +23,15 @@ public:
     
     bool Load( const char * filename, const bool verbose = false );
 
-	const unsigned char * DataPtr() const { return m_data_ptr; }
+	const unsigned char * DataPtr() const { return ( NULL == m_dataMipsPtr ) ? m_data_ptr : m_dataMipsPtr; }
 
 	int GetWidth() const    { return m_width; }
 	int GetHeight() const   { return m_height; }
+    int GetMips() const     { return m_mips; }
 
 	int GetBitsPerPixel() const { return m_bitsPerPixel; }
+
+    void GenerateMips();
 
 private:
     static void DisplayHeader( const unsigned char * data, const int size );
@@ -38,9 +41,12 @@ private:
 	int m_width;
 	int m_height;
     int m_bitsPerPixel;
+    int m_mips;
     
     int m_ordering;
 	int m_targaOrdering;
-    
+public:
     unsigned char * m_data_ptr;
+
+    unsigned char * m_dataMipsPtr;
 };

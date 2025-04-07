@@ -335,6 +335,8 @@ bool Application::InitializeVulkan() {
 	m_uniformBuffer[ 1 ].Allocate( &m_device, NULL, sizeof( float ) * 16 * 4 * 4096, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT );
 	m_unformModelIDs.Allocate( &m_device, NULL, sizeof( int ) * 16 * 4 * 4096, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT );
 
+	m_storageBufferOrientsRTX.Allocate( &m_device, NULL, sizeof( float ) * 16 * 4 * 4096, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT );
+
 	//
 	//	Render passes
 	//
@@ -433,6 +435,8 @@ void Application::Cleanup() {
 	m_uniformBuffer[ 0 ].Cleanup( &m_device );
 	m_uniformBuffer[ 1 ].Cleanup( &m_device );
 	m_unformModelIDs.Cleanup( &m_device );
+
+	m_storageBufferOrientsRTX.Cleanup( &m_device );
 
 	CleanupDepthPrePass( &m_device );
 	CleanupOffscreen( &m_device );
@@ -660,6 +664,7 @@ void Application::UpdateUniforms() {
 	{
 		unsigned char * mappedData = (unsigned char *)m_uniformBuffer[ g_frame % 2 ].MapBuffer( &m_device );
 		unsigned char * mappedModelIDs = (unsigned char *)m_unformModelIDs.MapBuffer( &m_device );
+		Mat4 * mappedOrientsRTX = (Mat4*)m_storageBufferOrientsRTX.MapBuffer( &m_device );
 
 		//
 		// Update the uniform buffer with the camera information
@@ -703,7 +708,7 @@ void Application::UpdateUniforms() {
 			glfwGetWindowSize( m_glfwWindow, &windowWidth, &windowHeight );
 
 			const float zNear   = 0.25f;
-			const float zFar    = 5000.0f;
+			const float zFar    = 500.0f;
 			float fovy	= 60;
 			const float aspect	= (float)windowHeight / (float)windowWidth;
 
@@ -828,10 +833,14 @@ void Application::UpdateUniforms() {
 			if ( uboByteOffset >= m_uniformBuffer[ g_frame % 2 ].m_vkBufferSize ) {
 				break;
 			}
+
+			// Update the storage buffer for the rtx
+			mappedOrientsRTX[ i ] = matOrient;
 		}
 
 		m_uniformBuffer[ g_frame % 2 ].UnmapBuffer( &m_device );
 		m_unformModelIDs.UnmapBuffer( &m_device );
+		m_storageBufferOrientsRTX.UnmapBuffer( &m_device );
 	}
 	
 	//
@@ -905,6 +914,7 @@ void Application::DrawFrame() {
 	parms.uniforms = &m_uniformBuffer[ g_frame % 2 ];
 	parms.uniformsOld = &m_uniformBuffer[ ( g_frame + 1 ) % 2 ];
 	parms.uniformsModelIDs = &m_unformModelIDs;
+	parms.storageOrientsRTX = &m_storageBufferOrientsRTX;
 	parms.renderModels = culledRenderModels.data();
 	parms.numModels = (int)culledRenderModels.size();
 	parms.notCulledRenderModels = m_renderModels.data();

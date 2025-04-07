@@ -50,103 +50,106 @@ bool Image::Create( DeviceContext * device, const CreateParms_t & parms ) {
 	//
 	//	Create the Image
 	//
-
-	VkImageCreateInfo image = {};
-	image.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-	image.imageType = VK_IMAGE_TYPE_1D;
-	if ( m_parms.height > 1 ) {
-		image.imageType = VK_IMAGE_TYPE_2D;
-	}
-	if ( m_parms.depth > 1 ) {
-		image.imageType = VK_IMAGE_TYPE_3D;
-	}
+	{
+		VkImageCreateInfo image = {};
+		image.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+		image.imageType = VK_IMAGE_TYPE_1D;
+		if ( m_parms.height > 1 ) {
+			image.imageType = VK_IMAGE_TYPE_2D;
+		}
+		if ( m_parms.depth > 1 ) {
+			image.imageType = VK_IMAGE_TYPE_3D;
+		}
 	
-	image.extent.width = m_parms.width;
-	image.extent.height = m_parms.height;
-	image.extent.depth = m_parms.depth;
-	image.mipLevels = m_parms.mipLevels;
-	image.arrayLayers = 1;
-	image.samples = VK_SAMPLE_COUNT_1_BIT;
-	image.tiling = VK_IMAGE_TILING_OPTIMAL;
-	image.format = m_parms.format;
-	if ( VK_FORMAT_D32_SFLOAT == m_parms.format ) {
-		image.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-	} else {
-		image.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-	}
-	image.usage = parms.usageFlags;
+		image.extent.width = m_parms.width;
+		image.extent.height = m_parms.height;
+		image.extent.depth = m_parms.depth;
+		image.mipLevels = m_parms.mipLevels;
+		image.arrayLayers = 1;
+		image.samples = VK_SAMPLE_COUNT_1_BIT;
+		image.tiling = VK_IMAGE_TILING_OPTIMAL;
+		image.format = m_parms.format;
+		if ( VK_FORMAT_D32_SFLOAT == m_parms.format ) {
+			image.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+		} else {
+			image.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+		}
+		image.usage = parms.usageFlags;
 
-	result = vkCreateImage( device->m_vkDevice, &image, nullptr, &m_vkImage );
-	if ( VK_SUCCESS != result ) {
-		printf( "ERROR: Failed to create image\n" );
-		assert( 0 );
-		return false;
+		result = vkCreateImage( device->m_vkDevice, &image, nullptr, &m_vkImage );
+		if ( VK_SUCCESS != result ) {
+			printf( "ERROR: Failed to create image\n" );
+			assert( 0 );
+			return false;
+		}
 	}
 
-	const uint64_t imageInt = (uint64_t)m_vkImage;
-	if ( imageInt == 0xbec98000000421da ) {
-		static volatile int c = 0;
-		c++;
-	}
+// 	const uint64_t imageInt = (uint64_t)m_vkImage;
+// 	if ( imageInt == 0xbec98000000421da ) {
+// 		static volatile int c = 0;
+// 		c++;
+// 	}
 
 	//
 	//	Allocate memory on the GPU and attach it to the image
 	//
+	{
+		VkMemoryAllocateInfo memAlloc = {};
+		memAlloc.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+		VkMemoryRequirements memReqs;
+		vkGetImageMemoryRequirements( device->m_vkDevice, m_vkImage, &memReqs );
+		memAlloc.allocationSize = memReqs.size;
+		memAlloc.memoryTypeIndex = device->FindMemoryTypeIndex( memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
 
-	VkMemoryAllocateInfo memAlloc = {};
-	memAlloc.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-	VkMemoryRequirements memReqs;
-	vkGetImageMemoryRequirements( device->m_vkDevice, m_vkImage, &memReqs );
-	memAlloc.allocationSize = memReqs.size;
-	memAlloc.memoryTypeIndex = device->FindMemoryTypeIndex( memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
+		result = vkAllocateMemory( device->m_vkDevice, &memAlloc, nullptr, &m_vkDeviceMemory );
+		if ( VK_SUCCESS != result ) {
+			printf( "ERROR: Failed to allocate memory\n" );
+			assert( 0 );
+			return false;
+		}
 
-	result = vkAllocateMemory( device->m_vkDevice, &memAlloc, nullptr, &m_vkDeviceMemory );
-	if ( VK_SUCCESS != result ) {
-		printf( "ERROR: Failed to allocate memory\n" );
-		assert( 0 );
-		return false;
-	}
-
-	result = vkBindImageMemory( device->m_vkDevice, m_vkImage, m_vkDeviceMemory, 0 );
-	if ( VK_SUCCESS != result ) {
-		printf( "ERROR: Failed to bind image memory\n" );
-		assert( 0 );
-		return false;
+		result = vkBindImageMemory( device->m_vkDevice, m_vkImage, m_vkDeviceMemory, 0 );
+		if ( VK_SUCCESS != result ) {
+			printf( "ERROR: Failed to bind image memory\n" );
+			assert( 0 );
+			return false;
+		}
 	}
 
 	//
 	//	Create the image view
 	//
+	{
+		VkImageViewCreateInfo imageView = {};
+		imageView.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+		imageView.viewType = VK_IMAGE_VIEW_TYPE_1D;
+		if ( m_parms.height > 1 ) {
+			imageView.viewType = VK_IMAGE_VIEW_TYPE_2D;
+		}
+		if ( m_parms.depth > 1 ) {
+			imageView.viewType = VK_IMAGE_VIEW_TYPE_3D;
+		}
 
-	VkImageViewCreateInfo imageView = {};
-	imageView.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-	imageView.viewType = VK_IMAGE_VIEW_TYPE_1D;
-	if ( m_parms.height > 1 ) {
-		imageView.viewType = VK_IMAGE_VIEW_TYPE_2D;
-	}
-	if ( m_parms.depth > 1 ) {
-		imageView.viewType = VK_IMAGE_VIEW_TYPE_3D;
-	}
+		imageView.format = m_parms.format;
+		imageView.subresourceRange = {};
+		if ( VK_FORMAT_D32_SFLOAT == m_parms.format ) {
+			imageView.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+		} else {
+			imageView.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		}
 
-	imageView.format = m_parms.format;
-	imageView.subresourceRange = {};
-	if ( VK_FORMAT_D32_SFLOAT == m_parms.format ) {
-		imageView.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-	} else {
-		imageView.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-	}
+		imageView.subresourceRange.baseMipLevel = 0;
+		imageView.subresourceRange.levelCount = m_parms.mipLevels;
+		imageView.subresourceRange.baseArrayLayer = 0;
+		imageView.subresourceRange.layerCount = 1;
+		imageView.image = m_vkImage;
 
-	imageView.subresourceRange.baseMipLevel = 0;
-	imageView.subresourceRange.levelCount = m_parms.mipLevels;
-	imageView.subresourceRange.baseArrayLayer = 0;
-	imageView.subresourceRange.layerCount = 1;
-	imageView.image = m_vkImage;
-
-	result = vkCreateImageView( device->m_vkDevice, &imageView, nullptr, &m_vkImageView );
-	if ( VK_SUCCESS != result ) {
-		printf( "ERROR: Failed to create image view\n" );
-		assert( 0 );
-		return false;
+		result = vkCreateImageView( device->m_vkDevice, &imageView, nullptr, &m_vkImageView );
+		if ( VK_SUCCESS != result ) {
+			printf( "ERROR: Failed to create image view\n" );
+			assert( 0 );
+			return false;
+		}
 	}
 
 	//
@@ -202,6 +205,17 @@ int Image::GetByteSize() const {
 		default: { byteSize = -1; } break;
 		case VkFormat::VK_FORMAT_R8G8B8A8_UNORM: {
 			byteSize = sizeof( unsigned char ) * 4 * m_parms.width * m_parms.height * m_parms.depth;
+
+			// Calculate the bytes for the mips
+			for ( int i = 1; i < m_parms.mipLevels; i++ ) {
+				int w = m_parms.width >> i;
+				int h = m_parms.height >> i;
+				int d = m_parms.depth >> i;
+				if ( 0 == w ) { w = 1; }
+				if ( 0 == h ) { h = 1; }
+				if ( 0 == d ) { d = 1; }
+				byteSize += sizeof( unsigned char ) * 4 * w * h * d;
+			}
 		} break;
 		case VkFormat::VK_FORMAT_R32G32_SFLOAT: { byteSize = sizeof( float ) * 2 * m_parms.width * m_parms.height * m_parms.depth; } break;
 		case VkFormat::VK_FORMAT_R32G32B32A32_SFLOAT: { byteSize = sizeof( float ) * 4 * m_parms.width * m_parms.height * m_parms.depth; } break;
@@ -255,7 +269,7 @@ bool Image::UploadData( DeviceContext * device, const void * data ) {
 			barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 		}
 		barrier.subresourceRange.baseMipLevel = 0;
-		barrier.subresourceRange.levelCount = 1;
+		barrier.subresourceRange.levelCount = m_parms.mipLevels;
 		barrier.subresourceRange.baseArrayLayer = 0;
 		barrier.subresourceRange.layerCount = 1;
 		barrier.srcAccessMask = 0;
@@ -287,26 +301,33 @@ bool Image::UploadData( DeviceContext * device, const void * data ) {
 	}
 
 	// Copy the buffer into the image
-	{
+	for ( int mip = 0; mip < m_parms.mipLevels; mip++ ) {
 		VkCommandBufferBeginInfo beginInfo = {};
 		beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 		beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 		vkResetCommandBuffer( vkCommandBuffer, 0 );
 		vkBeginCommandBuffer( vkCommandBuffer, &beginInfo );
 
+		int width = m_parms.width >> mip;
+		int height = m_parms.height >> mip;
+		int depth = m_parms.depth >> mip;
+		if ( 0 == width ) { width = 1; }
+		if ( 0 == height ) { height = 1; }
+		if ( 0 == depth ) { depth = 1; }
+
 		VkBufferImageCopy region = {};
 		region.bufferOffset = 0;
 		region.bufferRowLength = 0;
 		region.bufferImageHeight = 0;
 		region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-		region.imageSubresource.mipLevel = 0;
+		region.imageSubresource.mipLevel = mip;
 		region.imageSubresource.baseArrayLayer = 0;
 		region.imageSubresource.layerCount = 1;
 		region.imageOffset = { 0, 0, 0 };
 		region.imageExtent = {
-			(uint32_t)m_parms.width,
-			(uint32_t)m_parms.height,
-			(uint32_t)m_parms.depth
+			(uint32_t)width,
+			(uint32_t)height,
+			(uint32_t)depth
 		};
 
 		vkCmdCopyBufferToImage( vkCommandBuffer, stagingBuffer.m_vkBuffer, m_vkImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region );
@@ -341,7 +362,7 @@ bool Image::UploadData( DeviceContext * device, const void * data ) {
 			barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 		}
 		barrier.subresourceRange.baseMipLevel = 0;
-		barrier.subresourceRange.levelCount = 1;
+		barrier.subresourceRange.levelCount = m_parms.mipLevels;
 		barrier.subresourceRange.baseArrayLayer = 0;
 		barrier.subresourceRange.layerCount = 1;
 		barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
@@ -377,6 +398,21 @@ bool Image::UploadData( DeviceContext * device, const void * data ) {
 	m_vkImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
 	return true;
+}
+
+/*
+====================================================
+Image::GenerateMipMaps
+Note: this function has not been tested
+====================================================
+*/
+void Image::GenerateMipMaps( DeviceContext * device ) {
+	VkCommandBuffer vkCommandBuffer = device->CreateCommandBuffer( VK_COMMAND_BUFFER_LEVEL_PRIMARY, true );
+
+	GenerateMipMaps( device, vkCommandBuffer );
+
+	device->FlushCommandBuffer( vkCommandBuffer, device->m_vkGraphicsQueue );
+	
 }
 
 /*

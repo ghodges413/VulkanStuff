@@ -1,0 +1,292 @@
+#version 450
+
+
+#define WORK_GROUP_SIZE 8
+layout ( local_size_x = WORK_GROUP_SIZE, local_size_y = WORK_GROUP_SIZE, local_size_z = 1 ) in;
+
+layout( binding = 0 ) uniform writeonly image2D imageDestRed;
+layout( binding = 1 ) uniform writeonly image2D imageDestGreen;
+layout( binding = 2 ) uniform writeonly image2D imageDestBlue;
+layout( binding = 3, rgba16f ) uniform readonly image2D imageSourceRed;		// The raw/new SH samples from the ray tracer
+layout( binding = 4, rgba16f ) uniform readonly image2D imageSourceGreen;
+layout( binding = 5, rgba16f ) uniform readonly image2D imageSourceBlue;
+
+layout( binding = 6, rgba32f ) uniform readonly image2D imageGBuffer0;
+layout( binding = 7, rgba16f ) uniform readonly image2D imageGBuffer1;
+layout( binding = 8, rgba16f ) uniform readonly image2D imageGBuffer2;
+layout( binding = 9, rgba32f ) uniform readonly image2D imageGBufferHistory0;
+layout( binding = 10, rgba16f ) uniform readonly image2D imageGBufferHistory1;
+layout( binding = 11, rgba16f ) uniform readonly image2D imageGBufferHistory2;
+
+layout( binding = 12, rgba16f ) uniform readonly image2D imageVelocity;
+
+
+layout( binding = 13, rgba16f ) uniform readonly image2D imageHistoryRed;
+layout( binding = 14, rgba16f ) uniform readonly image2D imageHistoryGreen;
+layout( binding = 15, rgba16f ) uniform readonly image2D imageHistoryBlue;
+layout( binding = 16, r32ui ) uniform readonly uimage2D imageHistoryCounterSrc;
+layout( binding = 17, r32ui ) uniform writeonly uimage2D imageHistoryCounterDst;
+
+layout( binding = 18, rgba16f ) uniform image2D imageLuma;
+layout( binding = 19, rgba16f ) uniform readonly image2D imageLumaHistory;
+
+//shared vec2 groupData[ 256 ];
+
+bool IsCoplanar( vec3 pos, vec3 normal, vec3 historyPos ) {
+	vec3 ab = historyPos - pos;
+	float dist = dot( normal, ab );
+	//float displacement = 0.05;
+	float displacement = 0.01;
+	if ( abs( dist ) < displacement ) {
+		return true;
+	}
+	return false;
+}
+
+bool IsNormalSimilar( vec3 normal, vec3 historyNormal ) {
+	float dotdot = max( dot( normal, historyNormal ), 0.0 );
+
+	//float alpha = 0.95;
+	float alpha = 0.9;
+	if ( dotdot * dotdot > alpha ) {
+		return true;
+	}
+
+	return false;
+}
+
+float Luminance( vec3 color ) {
+	return dot( vec3( 0.2126, 0.7152, 0.0722 ), color );
+}
+
+vec3 ColorFromSH( in vec4 shRed, in vec4 shGreen, in vec4 shBlue, in vec3 dir ) {
+	const float c1 = 0.429043;
+    const float c2 = 0.511664;
+    const float c3 = 0.743125;
+    const float c4 = 0.886227;
+    const float c5 = 0.247708;
+
+	// Convert to spherical harmonic components
+    vec3 ylm00 = vec3( shRed.x, shGreen.x, shBlue.x );
+    vec3 ylm11 = vec3( shRed.y, shGreen.y, shBlue.y );
+    vec3 ylm10 = vec3( shRed.z, shGreen.z, shBlue.z );
+    vec3 ylm1n1 = vec3( shRed.w, shGreen.w, shBlue.w );
+
+    vec3 color = ylm00 * c4 + ( ylm11 * dir.x + ylm1n1 * dir.y + ylm10 * dir.z ) * 2.0 * c2;
+    return color;
+}
+
+float Luminance( in vec4 shRed, in vec4 shGreen, in vec4 shBlue, in vec3 normal ) {
+	vec3 color = ColorFromSH( shRed, shGreen, shBlue, normal );
+	return Luminance( color );
+}
+
+/*
+==========================
+SampleHistory
+==========================
+*/
+bool SampleHistory( in uint modelID, in vec3 worldPos, in vec3 worldNormal, out vec4 dstColorSH[ 3 ], out uint numHistory, out vec4 dstLuma ) {
+	ivec2 sti = ivec2( gl_GlobalInvocationID.xy );
+    vec4 velocity = imageLoad( imageVelocity, sti );
+	velocity.xy *= vec2( 1920, 1080 );
+	//velocity.xy += vec2( sti.x, sti.y );
+
+	vec2 st = fract( velocity.xy );
+
+	float weights[ 4 ];
+	ivec2 offsets[ 4 ];
+
+	if ( st.x < 0.5 ) {
+		offsets[ 0 ].x = -1;
+		offsets[ 1 ].x = 0;
+		offsets[ 2 ].x = 0;
+		offsets[ 3 ].x = -1;
+
+		weights[ 0 ] = 0.5 - st.x;
+		weights[ 1 ] = st.x + 0.5;
+		weights[ 2 ] = st.x + 0.5;
+		weights[ 3 ] = 0.5 - st.x;
+	} else {
+		offsets[ 0 ].x = 0;
+		offsets[ 1 ].x = 1;
+		offsets[ 2 ].x = 1;
+		offsets[ 3 ].x = 0;
+
+		weights[ 0 ] = st.x;
+		weights[ 1 ] = 1.0 - st.x;
+		weights[ 2 ] = 1.0 - st.x;
+		weights[ 3 ] = st.x;
+	}
+
+	if ( st.y < 0.5 ) {
+		offsets[ 0 ].y = -1;
+		offsets[ 1 ].y = -1;
+		offsets[ 2 ].y = 0;
+		offsets[ 3 ].y = 0;
+
+		weights[ 0 ] *= 0.5 - st.y;
+		weights[ 1 ] *= 0.5 - st.y;
+		weights[ 2 ] *= st.y + 0.5;
+		weights[ 3 ] *= st.y + 0.5;
+	} else {
+		offsets[ 0 ].y = 0;
+		offsets[ 1 ].y = 0;
+		offsets[ 2 ].y = 1;
+		offsets[ 3 ].y = 1;
+
+		weights[ 0 ] *= st.y;
+		weights[ 1 ] *= st.y;
+		weights[ 2 ] *= 1.0 - st.y;
+		weights[ 3 ] *= 1.0 - st.y;
+	}
+
+	// Sample the 2x2 pixel block and blend between them
+	sti += ivec2( velocity.xy );
+	
+#if 1 // 0 = single tap, 1 = multi-tap
+	const int numTaps = 4;
+#else
+	const int numTaps = 1;
+	offsets[ 0 ] = ivec2( 0 );
+#endif
+
+	float weightSum = 0;
+	for ( int i = 0; i < numTaps; i++ ) {
+		ivec2 st2 = sti + offsets[ i ];
+		if ( st2.x < 0 || st2.x >= 1980 || st2.y < 0 || st2.y >= 1080 ) {
+			weights[ i ] = 0;
+			continue;
+		}
+
+		vec3 positions = imageLoad( imageGBuffer0, st2 ).xyz;
+		vec3 normals = imageLoad( imageGBuffer2, st2 ).xyz;
+		uint modelIDs = uint( imageLoad( imageGBuffer2, st2 ).a );
+
+		// Discard any samples that were occluded
+		bool wasOccluded = false;
+		wasOccluded = !IsCoplanar( worldPos, worldNormal, positions );
+		wasOccluded = wasOccluded || !IsNormalSimilar( worldNormal, normals );
+		wasOccluded = wasOccluded || ( modelID != modelIDs );
+
+		// Discard any bad taps
+		//vec3 dp = positions - worldPos;
+		//float dn = dot( normals, worldNormal );
+		//wasOccluded = ( length( dp ) > 0.01 || dn < 0.9 );
+		if ( wasOccluded ) {
+			weights[ i ] = 0;
+			continue;
+		}
+
+		if ( numTaps > 1 ) {
+			weightSum += weights[ i ];
+		} else {
+			weights[ 0 ] = 1;
+			weightSum = 1;
+		}
+	}
+	//dstColor.rgb = velocity.xyz;	// DEBUG HACK
+	if ( 0 == weightSum ) {
+		numHistory = 0;
+		return false;
+	}
+
+	numHistory = imageLoad( imageHistoryCounterSrc, sti ).r;
+
+	dstColorSH[ 0 ] = vec4( 0 );
+	dstColorSH[ 1 ] = vec4( 0 );
+	dstColorSH[ 2 ] = vec4( 0 );
+	dstLuma = vec4( 0 );
+	for ( int i = 0; i < numTaps; i++ ) {
+		vec4 colorsRedSH = imageLoad( imageHistoryRed, sti + offsets[ i ] );
+		vec4 colorsGreenSH = imageLoad( imageHistoryGreen, sti + offsets[ i ] );
+		vec4 colorsBlueSH = imageLoad( imageHistoryBlue, sti + offsets[ i ] );
+
+		vec4 lumas = imageLoad( imageLumaHistory, sti + offsets[ i ] );
+
+		weights[ i ] = weights[ i ] / weightSum;	// Redistribute the weights
+		dstColorSH[ 0 ] += colorsRedSH * weights[ i ];
+		dstColorSH[ 1 ] += colorsGreenSH * weights[ i ];
+		dstColorSH[ 2 ] += colorsBlueSH * weights[ i ];
+		dstLuma += lumas * weights[ i ];
+	}
+
+	return true;
+}
+
+/*
+==========================
+main
+==========================
+*/
+void main() {
+	ivec2 st = ivec2( gl_GlobalInvocationID.xy );
+	if ( st.x >= 1920 || st.y >= 1080 ) {
+		return;
+	}
+
+	vec4 gbuffer0 = imageLoad( imageGBuffer0, st );
+    vec4 gbuffer1 = imageLoad( imageGBuffer1, st );
+    vec4 gbuffer2 = imageLoad( imageGBuffer2, st );
+
+	vec3 worldPos = gbuffer0.xyz;
+    vec3 diffuse = gbuffer1.rgb;
+    vec3 normal = gbuffer2.xyz;
+
+	float roughness = gbuffer0.a;
+    float metalness = gbuffer1.a;
+
+    if ( 0 == gbuffer2.a ) {
+		imageStore( imageDestRed, st, vec4( 0 ) );
+		imageStore( imageDestGreen, st, vec4( 0 ) );
+		imageStore( imageDestBlue, st, vec4( 0 ) );
+		imageStore( imageHistoryCounterDst, st, uvec4( 0 ) );
+		imageStore( imageLuma, st, vec4( 0 ) );
+		return;
+    }
+	uint modelID = uint( gbuffer2.a );
+
+	uint numHistory = 0;
+	vec4 historyColorSH[ 3 ];
+	historyColorSH[ 0 ] = vec4( 0 );
+	historyColorSH[ 1 ] = vec4( 0 );
+	historyColorSH[ 2 ] = vec4( 0 );
+	vec4 historyLuma = vec4( 0 );
+	vec4 sourceColorRed = imageLoad( imageSourceRed, st );
+	vec4 sourceColorGreen = imageLoad( imageSourceGreen, st );
+	vec4 sourceColorBlue = imageLoad( imageSourceBlue, st );
+	bool didHistory = SampleHistory( modelID, worldPos, normal, historyColorSH, numHistory, historyLuma );
+	if ( !didHistory ) {
+		historyColorSH[ 0 ] = sourceColorRed;
+		historyColorSH[ 1 ] = sourceColorGreen;
+		historyColorSH[ 2 ] = sourceColorBlue;
+	}
+
+	float alpha = 1.0 / float( numHistory + 1 );
+	vec4 colorRed = mix( historyColorSH[ 0 ], sourceColorRed, alpha );
+	vec4 colorGreen = mix( historyColorSH[ 0 ], sourceColorGreen, alpha );
+	vec4 colorBlue = mix( historyColorSH[ 0 ], sourceColorBlue, alpha );
+
+	// compute first two moments of luminance
+	vec2 moments;
+	moments.r = Luminance( colorRed, colorGreen, colorBlue, normal );
+	moments.g = moments.r * moments.r;
+	if ( !didHistory ) {
+		historyLuma.r = moments.r;
+		historyLuma.g = moments.g;
+	}
+
+	// temporal integration of the moments
+	moments = mix( historyLuma.rg, moments, alpha );
+
+	float variance = max( moments.g - moments.r * moments.r, 0.0 );
+	imageStore( imageLuma, st, vec4( moments.r, moments.g, variance, variance ) );
+	imageStore( imageDestRed, st, colorRed );
+	imageStore( imageDestGreen, st, colorGreen );
+	imageStore( imageDestBlue, st, colorRed );
+	imageStore( imageHistoryCounterDst, st, uvec4( numHistory + 1 ) );
+}
+
+
+ 
+ 
