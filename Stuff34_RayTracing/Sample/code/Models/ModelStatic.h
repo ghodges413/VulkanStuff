@@ -11,6 +11,7 @@
 #include "Math/Vector.h"
 #include "Math/Quat.h"
 #include "Math/Bounds.h"
+#include "BSP/Brush.h"
 
 
 /*
@@ -232,6 +233,7 @@ public:
 
 	bool BuildFromShape( const Shape * shape );
 	bool BuildFromCloth( float * verts, const int width, const int height, const int stride );
+	bool BuildFromBrush( const brush_t * brush );
 	void UpdateClothVerts( DeviceContext & deviceContext, float * verts, const int width, const int height, const int stride );
 
 	bool LoadOBJ( const char * localFileName );

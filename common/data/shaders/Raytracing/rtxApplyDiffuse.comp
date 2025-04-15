@@ -63,10 +63,14 @@ void main() {
 	vec4 shGreen = imageLoad( imageSHGreen, st );
 	vec4 shBlue = imageLoad( imageSHBlue, st );
 	vec3 bouncedLight = ColorFromSH( shRed, shGreen, shBlue, normal );
+	vec3 debugBounced = vec3( 0.0, bouncedLight.g, 0.0 );
 
 	vec3 lighting = imageLoad( imageDest, st ).rgb;
+	vec3 debugLight = vec3( lighting.r, 0.0, 0.0 );
 	lighting += bouncedLight;
 
 	vec3 finalColor = lighting * diffuse;
+	//finalColor = debugLight + debugBounced;
+	//finalColor = bouncedLight;
 	imageStore( imageDest, st, vec4( finalColor, 1.0 ) );
 }

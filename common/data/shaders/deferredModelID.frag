@@ -59,6 +59,7 @@ void main() {
 
     vec3 finalNorm  = normal.x * tang + normal.y * binorm + normal.z * norm;
     finalNorm       = normalize( finalNorm );
+    finalNorm = norm;
     
     // store the normal data
     FragData[ 2 ] = vec4( finalNorm, 1.0 );

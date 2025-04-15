@@ -9,7 +9,8 @@ layout( binding = 3, set = 0, rgba16f ) uniform readonly image2D imageGBuffer1;
 layout( binding = 4, set = 0, rgba16f ) uniform readonly image2D imageGBuffer2;
 
 //#define MAX_LIGHTS 128
-#define MAX_LIGHTS 32
+//#define MAX_LIGHTS 32
+#define MAX_LIGHTS 4
 
 struct pointLight_t {
 	vec4 mSphere;	// xyz = position, w = radius, these are in world space coordinates

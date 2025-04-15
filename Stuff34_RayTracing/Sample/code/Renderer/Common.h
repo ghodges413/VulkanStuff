@@ -19,7 +19,7 @@
 #define USE_SSR
 #endif
 
-//#define USE_TAA
+#define USE_TAA
 
 class Buffer;
 struct RenderModel;

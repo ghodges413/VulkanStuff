@@ -47,6 +47,10 @@ extern Player * g_player;
 
 //#define USE_SSAO_MULTIPLY	// Only available on Nvidia GPUS
 
+#define RENDER_BRUSHES
+
+std::vector< RenderModel > g_renderBrushes;
+
 /*
 ========================================================================================================
 
@@ -177,6 +181,9 @@ void Application::Initialize() {
 						entity.up = fwd[ idxUp ];
 						entity.pos = pos;
 						entity.isTransparent = false;
+
+// 						entity.fwd = Vec3( 1, 0, 0 );
+// 						entity.up = Vec3( 0, 0, 1 );
 						m_entities.push_back( entity );
 						break;
 					}
@@ -184,6 +191,31 @@ void Application::Initialize() {
 			}
 		}
 	}
+
+#if defined( RENDER_BRUSHES )
+	m_entities.clear();
+	for ( int i = 0; i < g_brushes.size(); i++ ) {
+		entity.fwd = Vec3( 1, 0, 0 );
+		entity.up = Vec3( 0, 0, 1 );
+		entity.pos = Vec3( 0, 0, 0 );
+		entity.isTransparent = false;
+		m_entities.push_back( entity );
+
+		
+
+		const brush_t & brush = g_brushes[ i ];
+
+		Model * model = new Model;
+		model->BuildFromBrush( &brush );
+		model->MakeVBO( &m_device );
+
+		RenderModel renderModel;
+		renderModel.modelDraw = model;
+		renderModel.orient = Quat( 0, 0, 0, 1 );
+		renderModel.pos = Vec3( 0, 0, 0 );
+		g_renderBrushes.push_back( renderModel );
+	}
+#endif
 
 	// Add transparent entities
 // 	entity.fwd = Vec3( 0, 1, 0 );
@@ -427,6 +459,11 @@ void Application::Cleanup() {
 
 	// Delete models
 	delete g_modelManager;
+
+	for ( int i = 0; i < g_renderBrushes.size(); i++ ) {
+		g_renderBrushes[ i ].modelDraw->Cleanup();
+		delete g_renderBrushes[ i ].modelDraw;
+	}
 
 	m_pipelineCopy.Cleanup( &m_device );
 	m_descriptorsCopy.Cleanup( &m_device );
@@ -786,6 +823,11 @@ void Application::UpdateUniforms() {
 
 			RenderModel renderModel;
 			renderModel.modelDraw = modelBlock;
+#if defined( RENDER_BRUSHES )
+			if ( i < g_renderBrushes.size() ) {
+				renderModel = g_renderBrushes[ i ];
+			}
+#endif
 			if ( entity.isTransparent ) {
 				renderModel.isTransparent = true;
 
@@ -895,7 +937,8 @@ void Application::DrawFrame() {
 		bounds.mins += pos;
 		bounds.maxs += pos;
 
-		if ( g_frustum.DoBoundsIntersectFrustum( bounds ) ) {
+		//if ( g_frustum.DoBoundsIntersectFrustum( bounds ) ) 
+		{
 			culledRenderModels.push_back( m_renderModels[ i ] );
 		}
 	}
@@ -934,12 +977,19 @@ void Application::DrawFrame() {
 	//
 	//	Fill the g-buffer
 	//
+#if defined( RENDER_BRUSHES )
+	UpdateGBufferCheckerBoardDescriptors( parms );
+#else
 	UpdateGBufferDescriptors( parms );
+#endif
 	UpdateDecalDescriptors( parms );
 	g_gbuffer.BeginRenderPass( parms.device, parms.cmdBufferIndex );
 
+#if defined( RENDER_BRUSHES )
+	DrawGBufferCheckerBoard( parms );
+#else
 	DrawGBuffer( parms );
-
+#endif
 //	DrawOceanDeferred( parms );
 
 //	DrawDecals( parms );

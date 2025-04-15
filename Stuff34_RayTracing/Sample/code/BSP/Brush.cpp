@@ -178,6 +178,24 @@ void BuildBrush( brush_t & brush ) {
 	for ( int i = 0; i < brush.numPlanes; i++ ) {
 		brush.windings[ i ] = BuildWinding( &brush, i );
 	}
+
+	// Heal the vertices to make it water tight
+	for ( int i = 0; i < brush.numPlanes; i++ ) {
+		winding_t & w = brush.windings[ i ];
+
+		for ( int j = i + 1; j < brush.numPlanes; j++ ) {
+			const winding_t & w2 = brush.windings[ j ];
+
+			for ( int n = 0; n < w.pts.size(); n++ ) {
+				for ( int m = 0; m < w2.pts.size(); m++ ) {
+					Vec3 delta = w.pts[ n ] - w2.pts[ m ];
+					if ( delta.GetLengthSqr() < 0.01 * 0.01 ) {
+						w.pts[ n ] = w2.pts[ m ];
+					}
+				}
+			}
+		}
+	}
 }
 
 /*

@@ -311,7 +311,11 @@ void DrawTemporalAntiAliasing( DrawParms_t & parms ) {
 	{
 #if defined( ENABLE_RAYTRACING )
 		extern Image g_rtxImage;
+		extern Image * g_rtxImageOut;
 		descriptor.BindImage( g_rtxImage, Samplers::m_samplerStandard, 0 );
+		if ( g_rtxImageOut ) {
+			descriptor.BindImage( *g_rtxImageOut, Samplers::m_samplerStandard, 0 );
+		}
 #elif defined( USE_SSR )
 		descriptor.BindImage( g_ssrFrameBuffer.m_imageColor, Samplers::m_samplerStandard, 0 );
 #else

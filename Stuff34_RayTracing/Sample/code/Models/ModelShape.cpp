@@ -3,6 +3,7 @@
 //
 #include "Models/ModelShape.h"
 #include "Physics/Shapes.h"
+#include "BSP/Brush.h"
 
 /*
 ====================================================
@@ -759,6 +760,58 @@ bool Model::BuildFromCloth( float * verts, const int width, const int height, co
 			m_indices.push_back( idx00 );
 			m_indices.push_back( idx01 );
 			m_indices.push_back( idx11 );
+		}
+	}
+
+	return true;
+}
+
+/*
+====================================================
+Model::UpdateClothVerts
+====================================================
+*/
+bool Model::BuildFromBrush( const brush_t * brush ) {
+	for ( int i = 0; i < brush->numPlanes; i++ ) {
+		const winding_t & winding = brush->windings[ i ];
+		const plane_t & plane = brush->planes[ i ];
+		Vec3 up = Vec3( 0, 0, 1 );
+		if ( plane.normal.z * plane.normal.z > 0.9f ) {
+			up = Vec3( 1, 0, 0 );
+		}
+		Vec3 tang = plane.normal.Cross( up );
+
+		int idx0 = m_vertices.size();
+		for ( int j = 0; j < winding.pts.size(); j++ ) {
+			vert_t vert;
+			memset( &vert, 0, sizeof( vert ) );
+
+			vert.pos = winding.pts[ j ];
+			// TODO: Load the ST values from the file
+			// TODO: Use the st values to calculate the tangent vector
+			vert_t::Vec3ToByte4( plane.normal, vert.norm );
+			vert_t::Vec3ToByte4( tang, vert.tang );
+
+			// Select the vertex color from the normal (this is for global illumination)
+			vert.buff[ 0 ] = 0;
+			vert.buff[ 1 ] = 0;
+			vert.buff[ 2 ] = 0;
+			vert.buff[ 3 ] = 255;
+			if ( fabsf( plane.normal.z ) >= 0.5f ) {
+				vert.buff[ 2 ] = 255;
+			} else if ( fabsf( plane.normal.x ) >= 0.5f ) {
+				vert.buff[ 0 ] = 255;
+			} else {
+				vert.buff[ 1 ] = 255;
+			}
+			
+			m_vertices.push_back( vert );
+
+			int idxN = idx0 + j;
+			int idxN1 = idx0 + ( ( j + 1 ) % winding.pts.size() );
+			m_indices.push_back( idx0 );
+			m_indices.push_back( idxN );
+			m_indices.push_back( idxN1 );
 		}
 	}
 

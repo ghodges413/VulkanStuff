@@ -1083,6 +1083,14 @@ void DrawRaytracing( DrawParms_t & parms ) {
 	g_rtxImageLumaB.TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_GENERAL );
 	g_rtxImageLumaHistory.TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_GENERAL );
 
+	g_rtxGIRawImages[ 0 ].TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_GENERAL );
+	g_rtxGIRawImages[ 1 ].TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_GENERAL );
+	g_rtxGIRawImages[ 2 ].TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_GENERAL );
+
+	g_rtxGIImageOut[ 0 ] = &g_rtxGIRawImages[ 0 ];
+	g_rtxGIImageOut[ 1 ] = &g_rtxGIRawImages[ 1 ];
+	g_rtxGIImageOut[ 2 ] = &g_rtxGIRawImages[ 2 ];
+
 	TraceGI( parms );
 
 	//

@@ -153,7 +153,7 @@ void main() {
 	pos = gl_WorldRayOriginNV + gl_RayTmaxNV * gl_WorldRayDirectionNV;
 	pos = gl_ObjectRayOriginNV + gl_RayTmaxNV * gl_ObjectRayDirectionNV;
 	hitValue.pos.xyz = pos;
-	hitValue.color = vec4( 0 );
+	hitValue.color = vec4( 1 );
 
 #ifdef USE_TRIANGLES
 	//gl_InstanceID		// The index of the model instance we hit
@@ -165,6 +165,12 @@ void main() {
 	hitValue.pos = orient * hitValue.pos;
 	hitValue.norm = orient * hitValue.norm;
 #endif
+
+	pos = gl_WorldRayOriginNV + gl_RayTmaxNV * gl_WorldRayDirectionNV;
+	hitValue.pos.xyz = pos;
+	hitValue.norm.xyz = gl_WorldRayDirectionNV * -1.0;
+
+	hitValue.color = vec4( 1, 0, 0, 1 );
 }
 
 

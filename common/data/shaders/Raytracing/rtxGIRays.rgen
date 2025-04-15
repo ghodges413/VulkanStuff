@@ -12,7 +12,8 @@ layout( binding = 5, set = 0, rgba16f ) uniform readonly image2D imageGBuffer1;
 layout( binding = 6, set = 0, rgba16f ) uniform readonly image2D imageGBuffer2;
 
 //#define MAX_LIGHTS 128
-#define MAX_LIGHTS 32
+//#define MAX_LIGHTS 32
+#define MAX_LIGHTS 4
 
 struct pointLight_t {
 	vec4 mSphere;	// xyz = position, w = radius, these are in world space coordinates
@@ -278,8 +279,11 @@ void main() {
 	// TODO: use the hit record color to modify the light color
 	// (we're skipping this now, because we are not currently storing
 	// diffuse color in the triangle vertices)
+	vec3 color = record0.color.rgb * light.mColor.rgb * light.mColor.w;
+	color = light.mColor.rgb * light.mColor.w;
 
-	vec3 lighting = dotdot * light.mColor.rgb * light.mColor.w / dist;
+	vec3 lighting = dotdot * color / dist;
+	//lighting = record0.color.rgb;
 
 	// Now that we have the lighting information, store it in SH components to preserve its direction
 	vec3 dir = normalize( record0.pos.xyz - worldPos );

@@ -144,7 +144,10 @@ bool InitLightTiles( DeviceContext * device, int width, int height, brush_t * br
 		} else if ( 2 == colorID ) {
 			light.m_color = Vec4( 0, 0, 1, 1 );
 		}
-		light.m_color.w = 2.0f;
+		light.m_color = Vec4( 1.0f );
+		light.m_color.w = 10.0f;
+		//light.m_color.w = 2.0f;
+		
 
 		Vec3 pos;
 		bool isInBrush = false;

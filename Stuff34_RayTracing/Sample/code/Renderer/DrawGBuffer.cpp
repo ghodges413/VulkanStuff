@@ -19,6 +19,9 @@ Descriptors	g_depthPrePassGBufferDescriptors;
 Pipeline	g_deferredPipeline;
 Descriptors	g_deferredDescriptors;
 
+Pipeline	g_deferredCheckerBoardPipeline;
+Descriptors	g_deferredCheckerBoardDescriptors;
+
 static Image g_imageDiffuse;
 static Image g_imageNormals;
 static Image g_imageRoughness;
@@ -117,6 +120,40 @@ bool InitGBuffer( DeviceContext * device, int width, int height ) {
 		pipelineParms.depthWrite = true;
 		pipelineParms.numColorAttachments = GFrameBuffer::s_numColorImages;
 		result = g_deferredPipeline.Create( device, pipelineParms );
+		if ( !result ) {
+			printf( "Unable to build pipeline!\n" );
+			assert( 0 );
+			return false;
+		}
+	}
+
+	//
+	//	Fill gbuffer checkerboard
+	//
+	{
+		Descriptors::CreateParms_t descriptorParms;
+		memset( &descriptorParms, 0, sizeof( descriptorParms ) );
+		descriptorParms.type = Descriptors::TYPE_GRAPHICS;
+		descriptorParms.numUniformsVertex = 3;
+		result = g_deferredCheckerBoardDescriptors.Create( device, descriptorParms );
+		if ( !result ) {
+			printf( "Unable to build descriptors!\n" );
+			assert( 0 );
+			return false;
+		}
+
+		Pipeline::CreateParms_t pipelineParms;
+		pipelineParms.framebuffer = NULL;//&g_gbuffer;
+		pipelineParms.renderPass = g_gbuffer.m_vkRenderPass;
+		pipelineParms.descriptors = &g_deferredCheckerBoardDescriptors;
+		pipelineParms.shader = g_shaderManager->GetShader( "deferredCheckerboard" );
+		pipelineParms.width = g_gbuffer.m_parms.width;
+		pipelineParms.height = g_gbuffer.m_parms.height;
+		pipelineParms.cullMode = Pipeline::CULL_MODE_BACK;
+		pipelineParms.depthTest = true;
+		pipelineParms.depthWrite = true;
+		pipelineParms.numColorAttachments = GFrameBuffer::s_numColorImages;
+		result = g_deferredCheckerBoardPipeline.Create( device, pipelineParms );
 		if ( !result ) {
 			printf( "Unable to build pipeline!\n" );
 			assert( 0 );
@@ -234,6 +271,9 @@ void CleanupGBuffer( DeviceContext * device ) {
 	g_deferredPipeline.Cleanup( device );
 	g_deferredDescriptors.Cleanup( device );
 
+	g_deferredCheckerBoardPipeline.Cleanup( device );
+	g_deferredCheckerBoardDescriptors.Cleanup( device );
+
 	g_imageDiffuse.Cleanup( device );
 	g_imageNormals.Cleanup( device );
 	g_imageRoughness.Cleanup( device );
@@ -329,6 +369,76 @@ void UpdateGBufferDescriptors( DrawParms_t & parms ) {
 	}
 }
 
+
+/*
+====================================================
+UpdateGBufferCheckerBoardDescriptors
+====================================================
+*/
+void UpdateGBufferCheckerBoardDescriptors( DrawParms_t & parms ) {
+	DeviceContext * device = parms.device;
+	int cmdBufferIndex = parms.cmdBufferIndex;
+	Buffer * uniforms = parms.uniforms;
+	const RenderModel * renderModels = parms.renderModels;
+	const int numModels = parms.numModels;
+	VkCommandBuffer cmdBuffer = device->m_vkCommandBuffers[ cmdBufferIndex ];
+
+	const int camOffset = 0;
+	const int camSize = sizeof( float ) * 16 * 2;
+
+	//
+	//	Depth pre-pass
+	//
+	{
+		g_depthDescriptorList.reserve( numModels );
+		g_depthDescriptorList.clear();
+
+		for ( int i = 0; i < numModels; i++ ) {
+			const RenderModel & renderModel = renderModels[ i ];
+			if ( NULL == renderModel.modelDraw ) {
+				continue;
+			}
+			if ( renderModel.isTransparent ) {
+				continue;
+			}
+
+			// Descriptor is how we bind our buffers and images
+			Descriptor descriptor = g_depthPrePassGBufferPipeline.GetFreeDescriptor();
+			descriptor.BindBuffer( uniforms, camOffset, camSize, 0 );									// bind the camera matrices
+			descriptor.BindBuffer( uniforms, renderModel.uboByteOffset, renderModel.uboByteSize, 1 );	// bind the model matrices
+			
+			descriptor.UpdateDescriptor( device );
+			g_depthDescriptorList.push_back( descriptor );
+		}
+	}
+
+	//
+	//	Fill g-buffer
+	//
+	{
+		g_descriptorList.reserve( numModels );
+		g_descriptorList.clear();
+
+		for ( int i = 0; i < numModels; i++ ) {
+			const RenderModel & renderModel = renderModels[ i ];
+			if ( NULL == renderModel.modelDraw ) {
+				continue;
+			}
+			if ( renderModel.isTransparent ) {
+				continue;
+			}
+
+			// Descriptor is how we bind our buffers and images
+			Descriptor descriptor = g_deferredCheckerBoardPipeline.GetFreeDescriptor();
+			descriptor.BindBuffer( uniforms, camOffset, camSize, 0 );									// bind the camera matrices
+			descriptor.BindBuffer( uniforms, renderModel.uboByteOffset, renderModel.uboByteSize, 1 );	// bind the model matrices
+			descriptor.BindBuffer( parms.uniformsModelIDs, renderModel.uboByteOffsetModelID, renderModel.uboByteSizeModelID, 2 );
+			descriptor.UpdateDescriptor( device );
+			g_descriptorList.push_back( descriptor );
+		}
+	}
+}
+
 /*
 ====================================================
 DrawGBuffer
@@ -382,6 +492,66 @@ void DrawGBuffer( DrawParms_t & parms ) {
 			}
 
 			g_descriptorList[ idx ].BindDescriptor( cmdBuffer, &g_deferredPipeline );
+			renderModel.modelDraw->DrawIndexed( cmdBuffer );
+			idx++;
+		}
+	}
+}
+
+
+/*
+====================================================
+DrawGBufferCheckerBoard
+====================================================
+*/
+void DrawGBufferCheckerBoard( DrawParms_t & parms ) {
+	DeviceContext * device = parms.device;
+	int cmdBufferIndex = parms.cmdBufferIndex;
+	Buffer * uniforms = parms.uniforms;
+	const RenderModel * renderModels = parms.renderModels;
+	const int numModels = parms.numModels;
+	VkCommandBuffer cmdBuffer = device->m_vkCommandBuffers[ cmdBufferIndex ];
+
+	const int camOffset = 0;
+	const int camSize = sizeof( float ) * 16 * 2;
+
+	//
+	//	Depth pre-pass
+	//
+	{
+		int idx = 0;
+		g_depthPrePassGBufferPipeline.BindPipeline( cmdBuffer );
+		for ( int i = 0; i < numModels; i++ ) {
+			const RenderModel & renderModel = renderModels[ i ];
+			if ( NULL == renderModel.modelDraw ) {
+				continue;
+			}
+			if ( renderModel.isTransparent ) {
+				continue;
+			}
+
+			g_depthDescriptorList[ idx ].BindDescriptor( cmdBuffer, &g_depthPrePassGBufferPipeline );
+			renderModel.modelDraw->DrawIndexed( cmdBuffer );
+			idx++;
+		}
+	}
+
+	//
+	//	Fill g-buffer
+	//
+	{
+		int idx = 0;
+		g_deferredCheckerBoardPipeline.BindPipeline( cmdBuffer );
+		for ( int i = 0; i < numModels; i++ ) {
+			const RenderModel & renderModel = renderModels[ i ];
+			if ( NULL == renderModel.modelDraw ) {
+				continue;
+			}
+			if ( renderModel.isTransparent ) {
+				continue;
+			}
+
+			g_descriptorList[ idx ].BindDescriptor( cmdBuffer, &g_deferredCheckerBoardPipeline );
 			renderModel.modelDraw->DrawIndexed( cmdBuffer );
 			idx++;
 		}
