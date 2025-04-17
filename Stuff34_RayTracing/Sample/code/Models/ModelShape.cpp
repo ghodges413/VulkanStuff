@@ -797,9 +797,12 @@ bool Model::BuildFromBrush( const brush_t * brush ) {
 			vert.buff[ 1 ] = 0;
 			vert.buff[ 2 ] = 0;
 			vert.buff[ 3 ] = 255;
-			if ( fabsf( plane.normal.z ) >= 0.5f ) {
+			float x2 = plane.normal.x * plane.normal.x;
+			float y2 = plane.normal.y * plane.normal.y;
+			float z2 = plane.normal.z * plane.normal.z;
+			if ( z2 > x2 && z2 > y2 ) {
 				vert.buff[ 2 ] = 255;
-			} else if ( fabsf( plane.normal.x ) >= 0.5f ) {
+			} else if ( x2 > y2 && x2 > z2 ) {
 				vert.buff[ 0 ] = 255;
 			} else {
 				vert.buff[ 1 ] = 255;
