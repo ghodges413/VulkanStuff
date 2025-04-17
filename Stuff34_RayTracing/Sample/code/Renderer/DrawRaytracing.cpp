@@ -989,7 +989,6 @@ void TraceGI( DrawParms_t & parms ) {
 		descriptor.BindDescriptor( device, cmdBuffer, &g_rtxGIAccumulatorPipeline );
 		g_rtxGIAccumulatorPipeline.DispatchCompute( cmdBuffer, ( 1920 + 7 ) / 8, ( 1080 + 7 ) / 8, 1 );
 	}
-	g_rtxImageOut = &g_rtxGIAccumulatedImages[ 0 ];
 
 	MemoryBarriers::CreateImageMemoryBarrier( cmdBuffer, g_rtxGIAccumulatedImages[ 0 ], VK_IMAGE_ASPECT_COLOR_BIT );
 	MemoryBarriers::CreateImageMemoryBarrier( cmdBuffer, g_rtxGIAccumulatedImages[ 1 ], VK_IMAGE_ASPECT_COLOR_BIT );
@@ -1050,7 +1049,6 @@ void TraceGI( DrawParms_t & parms ) {
 		MemoryBarriers::CreateImageMemoryBarrier( cmdBuffer, *dstImages[ 1 ], VK_IMAGE_ASPECT_COLOR_BIT );
 		MemoryBarriers::CreateImageMemoryBarrier( cmdBuffer, *dstImages[ 2 ], VK_IMAGE_ASPECT_COLOR_BIT );
 
-		g_rtxImageOut = dstImages[ 0 ];
 		startIdx = 1;
 
 		// Copy the first temporal filtered image into the history buffer
@@ -1100,9 +1098,6 @@ void TraceGI( DrawParms_t & parms ) {
 		srcImages[ 2 ] = ( ( i & 1 ) == 0 ) ? &g_rtxGIAccumulatedImages[ 2 ] : &g_rtxGIImageDenoised[ 2 ];
 		dstImages[ 2 ] = ( ( i & 1 ) == 0 ) ? &g_rtxGIImageDenoised[ 2 ] : &g_rtxGIAccumulatedImages[ 2 ];
 
-// 		Image * srcImage = ( ( i & 1 ) == 0 ) ? &g_rtxGIImageAccumulated : &g_rtxGIImageDenoised;
-// 		Image * dstImage = ( ( i & 1 ) == 0 ) ? &g_rtxGIImageDenoised : &g_rtxGIImageAccumulated;
-
 		Image * srcLuma = ( ( i & 1 ) == 0 ) ? &g_rtxGIImageLumaA : &g_rtxGIImageLumaB;
 		Image * dstLuma = ( ( i & 1 ) == 0 ) ? &g_rtxGIImageLumaB : &g_rtxGIImageLumaA;
 
@@ -1133,9 +1128,6 @@ void TraceGI( DrawParms_t & parms ) {
 		MemoryBarriers::CreateImageMemoryBarrier( cmdBuffer, *dstImages[ 1 ], VK_IMAGE_ASPECT_COLOR_BIT );
 		MemoryBarriers::CreateImageMemoryBarrier( cmdBuffer, *dstImages[ 2 ], VK_IMAGE_ASPECT_COLOR_BIT );
 
-		g_rtxImageOut = dstImages[ 0 ];
-		//g_rtxImageOut = dstLuma;
-
 		g_rtxGIImageOut[ 0 ] = dstImages[ 0 ];
 		g_rtxGIImageOut[ 1 ] = dstImages[ 1 ];
 		g_rtxGIImageOut[ 2 ] = dstImages[ 2 ];
@@ -1144,14 +1136,11 @@ void TraceGI( DrawParms_t & parms ) {
 
 /*
 ====================================================
-DrawRaytracing
+TraceDL
+The direct lighting
 ====================================================
 */
-void DrawRaytracing( DrawParms_t & parms ) {
-#if defined( ENABLE_RAYTRACING )
-// 	TraceSimple( parms );
-// 	return;
-
+void TraceDL( DrawParms_t & parms ) {
 	DeviceContext * device = parms.device;
 	int cmdBufferIndex = parms.cmdBufferIndex;
 	Buffer * uniforms = parms.uniforms;
@@ -1167,34 +1156,7 @@ void DrawRaytracing( DrawParms_t & parms ) {
 
 	const int timeOffset = shadowCamOffset + shadowCamSize;
 	const int timeSize = sizeof( Vec4 );
-
-	g_numFrames++;
 	
-	// Make sure the rtx image is in general layout
-	g_rtxImage.TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_GENERAL );
-	g_rtxImageAccumulated.TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_GENERAL );
-	g_rtxImageDenoised.TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_GENERAL );
-	g_rtxImageHistory.TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_GENERAL );
-	g_rtxImageHistoryCounters[ 0 ].TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_GENERAL );
-	g_rtxImageHistoryCounters[ 1 ].TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_GENERAL );
-	g_gbufferHistory[ 0 ].TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_GENERAL );
-	g_gbufferHistory[ 1 ].TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_GENERAL );
-	g_gbufferHistory[ 2 ].TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_GENERAL );
-
-	g_rtxImageLumaA.TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_GENERAL );
-	g_rtxImageLumaB.TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_GENERAL );
-	g_rtxImageLumaHistory.TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_GENERAL );
-
-	g_rtxGIRawImages[ 0 ].TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_GENERAL );
-	g_rtxGIRawImages[ 1 ].TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_GENERAL );
-	g_rtxGIRawImages[ 2 ].TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_GENERAL );
-
-	g_rtxGIImageOut[ 0 ] = &g_rtxGIRawImages[ 0 ];
-	g_rtxGIImageOut[ 1 ] = &g_rtxGIRawImages[ 1 ];
-	g_rtxGIImageOut[ 2 ] = &g_rtxGIRawImages[ 2 ];
-
-	TraceGI( parms );
-
 	//
 	//	Ray Tracing
 	//
@@ -1456,7 +1418,65 @@ void DrawRaytracing( DrawParms_t & parms ) {
 #endif
 #endif
 #endif
+}
 
+/*
+====================================================
+DrawRaytracing
+====================================================
+*/
+void DrawRaytracing( DrawParms_t & parms ) {
+#if defined( ENABLE_RAYTRACING )
+#if 0	// enable to do simple ray tracing instead of lighting
+	TraceSimple( parms );
+	return;
+#endif
+
+	DeviceContext * device = parms.device;
+	int cmdBufferIndex = parms.cmdBufferIndex;
+	Buffer * uniforms = parms.uniforms;
+	const RenderModel * renderModels = parms.renderModels;
+	const int numModels = parms.numModels;
+	VkCommandBuffer cmdBuffer = device->m_vkCommandBuffers[ cmdBufferIndex ];
+
+	const int camOffset = 0;
+	const int camSize = sizeof( float ) * 16 * 4;
+
+	const int shadowCamOffset = camOffset + camSize;
+	const int shadowCamSize = camSize;
+
+	const int timeOffset = shadowCamOffset + shadowCamSize;
+	const int timeSize = sizeof( Vec4 );
+
+	g_numFrames++;
+	
+	// Make sure the rtx image is in general layout
+	g_rtxImage.TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_GENERAL );
+	g_rtxImageAccumulated.TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_GENERAL );
+	g_rtxImageDenoised.TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_GENERAL );
+	g_rtxImageHistory.TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_GENERAL );
+	g_rtxImageHistoryCounters[ 0 ].TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_GENERAL );
+	g_rtxImageHistoryCounters[ 1 ].TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_GENERAL );
+	g_gbufferHistory[ 0 ].TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_GENERAL );
+	g_gbufferHistory[ 1 ].TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_GENERAL );
+	g_gbufferHistory[ 2 ].TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_GENERAL );
+
+	g_rtxImageLumaA.TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_GENERAL );
+	g_rtxImageLumaB.TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_GENERAL );
+	g_rtxImageLumaHistory.TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_GENERAL );
+
+	g_rtxGIRawImages[ 0 ].TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_GENERAL );
+	g_rtxGIRawImages[ 1 ].TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_GENERAL );
+	g_rtxGIRawImages[ 2 ].TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_GENERAL );
+
+	g_rtxGIImageOut[ 0 ] = &g_rtxGIRawImages[ 0 ];
+	g_rtxGIImageOut[ 1 ] = &g_rtxGIRawImages[ 1 ];
+	g_rtxGIImageOut[ 2 ] = &g_rtxGIRawImages[ 2 ];
+
+	TraceDL( parms );
+
+	TraceGI( parms );
+	
 	//
 	//	Apply the lighting to the diffuse channel of the gbuffer
 	//
