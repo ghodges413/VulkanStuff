@@ -54,7 +54,7 @@ void main() {
     float metalness = gbuffer1.a;
 
     if ( 0 == gbuffer2.a ) {
-		imageStore( imageDest, st, vec4( 1, 0, 1, 1 ) );
+		imageStore( imageDest, st, vec4( 0, 0, 0, 1 ) );
 		return;
     }
 
