@@ -1,11 +1,14 @@
 # Ray Tracing
 
+Direct lighting with SVGF filering:
 ![Ray Tracing](rtxDirect0.jpg)
 ![Ray Tracing](rtxDirect1.jpg)
 
+Single bounce GI with SVGF:
 ![Ray Tracing](rtxBouncedOnly0.jpg)
 ![Ray Tracing](rtxBouncedOnly1.jpg)
 
+Direct lighting + GI:
 ![Ray Tracing](rtxComplete0.jpg)
 ![Ray Tracing](rtxComplete1.jpg)
 
