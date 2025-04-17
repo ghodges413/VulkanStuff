@@ -16,6 +16,9 @@
 
 static int g_numFrames = 0;
 
+Pipeline	g_rtxSimplePipeline;
+Descriptors	g_rtxSimpleDescriptors;
+
 Pipeline	g_rtxMonteCarloPipeline;
 Descriptors	g_rtxMonteCarloDescriptors;
 
@@ -356,6 +359,44 @@ bool InitRaytracing( DeviceContext * device, int width, int height ) {
 	result = InitGlobalIllumination( device, width, height );
 	if ( !result ) {
 		return false;
+	}
+
+	//
+	//	Simple Pipeline
+	//
+	{
+		//
+		//	Create descriptors
+		//
+		Descriptors::CreateParms_t descriptorParms;
+		memset( &descriptorParms, 0, sizeof( descriptorParms ) );
+		descriptorParms.type = Descriptors::TYPE_RAYTRACE;
+		descriptorParms.numAccelerationStructures = 1;
+		descriptorParms.numUniformsRayGen = 1;
+		descriptorParms.numStorageImagesRayGen = 1;
+		//descriptorParms.numStorageBuffersRayGen = 1;
+		descriptorParms.numStorageBuffersClosestHit = 2;
+		descriptorParms.numStorageBuffersClosestHitArraySize = 8192;	// The max array size of the descriptors (the max number of render models in this case)
+		result = g_rtxSimpleDescriptors.Create( device, descriptorParms );
+		if ( !result ) {
+			return false;
+		}
+
+		//
+		//	Create Pipeline
+		//
+		Pipeline::CreateParms_t pipelineParms;
+		memset( &pipelineParms, 0, sizeof( pipelineParms ) );
+		pipelineParms.descriptors = &g_rtxSimpleDescriptors;
+		pipelineParms.width = width;
+		pipelineParms.height = height;
+		pipelineParms.pushConstantSize = sizeof( int );
+		pipelineParms.pushConstantShaderStages = VkShaderStageFlagBits::VK_SHADER_STAGE_RAYGEN_BIT_NV;
+		pipelineParms.shader = g_shaderManager->GetShader( "Raytracing/rtxCheckerboard" );
+		result = g_rtxSimplePipeline.CreateRayTracing( device, pipelineParms );
+		if ( !result ) {
+			return false;
+		}
 	}
 
 	//
@@ -702,6 +743,9 @@ CleanupRaytracing
 */
 void CleanupRaytracing( DeviceContext * device ) {
 #if defined( ENABLE_RAYTRACING )
+	g_rtxSimplePipeline.Cleanup( device );
+	g_rtxSimpleDescriptors.Cleanup( device );
+
 	g_rtxMonteCarloPipeline.Cleanup( device );
 	g_rtxMonteCarloDescriptors.Cleanup( device );
 
@@ -801,6 +845,46 @@ void UpdateRaytracing( DeviceContext * device, const RenderModel * models, int n
 
 /*
 ====================================================
+TraceSimple
+Simple checkerboard rendering for debug testing
+====================================================
+*/
+void TraceSimple( DrawParms_t & parms ) {
+	DeviceContext * device = parms.device;
+	int cmdBufferIndex = parms.cmdBufferIndex;
+	Buffer * uniforms = parms.uniforms;
+	Buffer * orientRTX = parms.storageOrientsRTX;
+	VkCommandBuffer cmdBuffer = device->m_vkCommandBuffers[ cmdBufferIndex ];
+
+	const int camOffset = 0;
+	const int camSize = sizeof( float ) * 16 * 4;
+
+	g_rtxImage.TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_GENERAL );
+
+	//
+	//	Simple Ray Tracing
+	//
+	{
+		g_rtxSimplePipeline.BindPipelineRayTracing( cmdBuffer );
+		g_rtxSimplePipeline.BindPushConstant( cmdBuffer, 0, sizeof( g_numFrames ), &g_numFrames );
+
+		Descriptor descriptor = g_rtxSimplePipeline.GetRTXDescriptor();
+		descriptor.BindAccelerationStructure( &g_rtxAccelerationStructure, 0 );
+
+		descriptor.BindStorageImage( g_rtxImage, Samplers::m_samplerStandard, 1 );
+
+		descriptor.BindBuffer( uniforms, camOffset, camSize, 2 );
+		
+		descriptor.BindRenderModelsRTX( parms.notCulledRenderModels, parms.numNotCulledRenderModels, 3, 4 );
+//		descriptor.BindStorageBuffer( orientRTX, 0, orientRTX->m_vkBufferSize, 5 );
+
+		descriptor.BindDescriptor( device, cmdBuffer, &g_rtxSimplePipeline );
+		g_rtxSimplePipeline.TraceRays( cmdBuffer );
+	}
+}
+
+/*
+====================================================
 TraceGI
 Single bounce global illumination
 ====================================================
@@ -861,6 +945,11 @@ void TraceGI( DrawParms_t & parms ) {
 		g_rtxGIRaysPipeline.TraceRays( cmdBuffer );
 	}
 
+	g_rtxGIImageOut[ 0 ] = &g_rtxGIRawImages[ 0 ];
+	g_rtxGIImageOut[ 1 ] = &g_rtxGIRawImages[ 1 ];
+	g_rtxGIImageOut[ 2 ] = &g_rtxGIRawImages[ 2 ];
+//	return;
+
 	//
 	//	GI Accumulator
 	//
@@ -906,6 +995,11 @@ void TraceGI( DrawParms_t & parms ) {
 	MemoryBarriers::CreateImageMemoryBarrier( cmdBuffer, g_rtxGIAccumulatedImages[ 1 ], VK_IMAGE_ASPECT_COLOR_BIT );
 	MemoryBarriers::CreateImageMemoryBarrier( cmdBuffer, g_rtxGIAccumulatedImages[ 2 ], VK_IMAGE_ASPECT_COLOR_BIT );
 	int startIdx = 0;
+
+	g_rtxGIImageOut[ 0 ] = &g_rtxGIAccumulatedImages[ 0 ];
+	g_rtxGIImageOut[ 1 ] = &g_rtxGIAccumulatedImages[ 1 ];
+	g_rtxGIImageOut[ 2 ] = &g_rtxGIAccumulatedImages[ 2 ];
+//	return;
 
 	//
 	//	GI Temporal Variance Filter
@@ -980,6 +1074,11 @@ void TraceGI( DrawParms_t & parms ) {
 			dstLuma->TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_GENERAL );
 			g_rtxGIImageLumaHistory.TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_GENERAL );
 		}
+
+		g_rtxGIImageOut[ 0 ] = dstImages[ 0 ];
+		g_rtxGIImageOut[ 1 ] = dstImages[ 1 ];
+		g_rtxGIImageOut[ 2 ] = dstImages[ 2 ];
+//		return;
 	}
 
 	//
@@ -1050,6 +1149,9 @@ DrawRaytracing
 */
 void DrawRaytracing( DrawParms_t & parms ) {
 #if defined( ENABLE_RAYTRACING )
+// 	TraceSimple( parms );
+// 	return;
+
 	DeviceContext * device = parms.device;
 	int cmdBufferIndex = parms.cmdBufferIndex;
 	Buffer * uniforms = parms.uniforms;
