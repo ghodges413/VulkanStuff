@@ -1,0 +1,71 @@
+#version 460
+#extension GL_NV_ray_tracing : require
+
+layout( binding = 0, set = 0 ) uniform accelerationStructureNV topLevelAS;
+
+layout( binding = 1, set = 0, rgba16f ) uniform writeonly image2D image;
+
+layout( binding = 2, set = 0 ) uniform CameraProperties
+{
+	mat4 view;
+	mat4 proj;
+} cam;
+
+
+struct record_t {
+	vec4 pos;
+	vec4 norm;
+	vec4 color;
+};
+layout( location = 0 ) rayPayloadNV record_t hitValue;
+
+
+
+/*
+==========================================
+main
+==========================================
+*/
+void main() {
+	vec2 pixelCenter = vec2( gl_LaunchIDNV.xy ) + vec2( 0.5 );
+	//pixelCenter += RandomInUnitDisk( seed ) * 0.5;
+	const vec2 inUV = pixelCenter / vec2( gl_LaunchSizeNV.xy );
+	vec2 d = inUV * 2.0 - 1.0;
+
+	mat4 viewInverse = inverse( cam.view );
+	mat4 projInverse = inverse( cam.proj );
+	vec4 origin = viewInverse * vec4( 0, 0, 0, 1 );
+	//vec4 target = projInverse * vec4( d.x, -d.y, 1, 1 );
+	vec4 target = projInverse * vec4( d.x, d.y, 1, 1 );
+	vec4 direction = viewInverse * vec4( normalize( target.xyz / target.w ), 0 );
+
+	// Trace a ray
+	{
+		vec3 rayStart = origin.xyz;
+		vec3 rayDir = direction.xyz;
+		uint rayFlags = gl_RayFlagsOpaqueNV;
+		uint cullMask = 0xff;
+		uint sbtRecordOffset = 0;
+		uint sbtRecordStride = 0;
+		uint missIndex = 0;
+		float tmin = 0.0125;
+		float tmax = 1000.0;
+		const int payload = 0;	
+
+		traceNV( topLevelAS, rayFlags, cullMask, sbtRecordOffset, sbtRecordStride, missIndex, rayStart.xyz, tmin, rayDir.xyz, tmax, payload );
+	}
+
+	// If this ray didn't hit anything, then save the skycolor
+	if ( hitValue.color.a < 0 ) {
+		vec4 skyColor;
+		skyColor.r = hitValue.color.r;
+		skyColor.g = hitValue.color.g;
+		skyColor.b = hitValue.color.b;
+		skyColor.a = 1.0;
+		imageStore( image, ivec2( gl_LaunchIDNV.xy ), skyColor );
+		return;
+	}
+
+	imageStore( image, ivec2( gl_LaunchIDNV.xy ), hitValue.color );
+}
+
