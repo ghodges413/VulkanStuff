@@ -219,8 +219,8 @@ void main() {
 
 			// Get the spherical harmonic components
 			vec4 qColorRed = imageLoad( imageSourceRed, stq );
-			vec4 qColorGreen = imageLoad( imageSourceRed, stq );
-			vec4 qColorBlue = imageLoad( imageSourceRed, stq );
+			vec4 qColorGreen = imageLoad( imageSourceGreen, stq );
+			vec4 qColorBlue = imageLoad( imageSourceBlue, stq );
 
 			// Convert the SH to color
 			vec3 qColor = ColorFromSH( qColorRed, qColorGreen, qColorBlue, qNorm );
