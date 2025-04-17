@@ -1,6 +1,13 @@
 # Ray Tracing
 
-![Ray Tracing](screenshot.jpg)
+![Ray Tracing](rtxDirect0.jpg)
+![Ray Tracing](rtxDirect1.jpg)
+
+![Ray Tracing](rtxBouncedOnly0.jpg)
+![Ray Tracing](rtxBouncedOnly1.jpg)
+
+![Ray Tracing](rtxComplete0.jpg)
+![Ray Tracing](rtxComplete1.jpg)
 
 Spatiotemporal Reservoir Resampling (ReSTIR) is an algorithm for path tracing that presents high quality results with only a few samples per pixel.
 
