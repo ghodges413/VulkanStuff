@@ -186,6 +186,7 @@ bool SampleHistory( in uint modelID, in vec3 worldPos, in vec3 worldNormal, out 
 		}
 	}
 	//dstColor.rgb = velocity.xyz;	// DEBUG HACK
+
 	if ( 0 == weightSum ) {
 		numHistory = 0;
 		return false;
@@ -264,8 +265,8 @@ void main() {
 
 	float alpha = 1.0 / float( numHistory + 1 );
 	vec4 colorRed = mix( historyColorSH[ 0 ], sourceColorRed, alpha );
-	vec4 colorGreen = mix( historyColorSH[ 0 ], sourceColorGreen, alpha );
-	vec4 colorBlue = mix( historyColorSH[ 0 ], sourceColorBlue, alpha );
+	vec4 colorGreen = mix( historyColorSH[ 1 ], sourceColorGreen, alpha );
+	vec4 colorBlue = mix( historyColorSH[ 2 ], sourceColorBlue, alpha );
 
 	// compute first two moments of luminance
 	vec2 moments;
@@ -283,7 +284,7 @@ void main() {
 	imageStore( imageLuma, st, vec4( moments.r, moments.g, variance, variance ) );
 	imageStore( imageDestRed, st, colorRed );
 	imageStore( imageDestGreen, st, colorGreen );
-	imageStore( imageDestBlue, st, colorRed );
+	imageStore( imageDestBlue, st, colorBlue );
 	imageStore( imageHistoryCounterDst, st, uvec4( numHistory + 1 ) );
 }
 
