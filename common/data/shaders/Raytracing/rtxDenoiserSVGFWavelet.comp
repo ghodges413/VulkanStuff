@@ -7,6 +7,8 @@ layout ( local_size_x = WORK_GROUP_SIZE, local_size_y = WORK_GROUP_SIZE, local_s
 
 layout( push_constant ) uniform pushIters {
     ivec4 iteration;
+	uint width;
+	uint height;
 } PushConstant;
 
 layout( binding = 0 ) uniform uboCamera {
@@ -143,7 +145,7 @@ main
 */
 void main() {
 	ivec2 st = ivec2( gl_GlobalInvocationID.xy );
-	if ( st.x >= 1920 || st.y >= 1080 ) {
+	if ( st.x >= PushConstant.width || st.y >= PushConstant.height ) {
 		return;
 	}
 

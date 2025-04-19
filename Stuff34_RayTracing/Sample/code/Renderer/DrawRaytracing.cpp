@@ -78,6 +78,9 @@ Image * g_rtxImageOut = NULL;
 
 extern FrameBuffer g_taaVelocityBuffer;
 
+int g_rtxWidth = 1920;
+int g_rtxHeight = 1080;
+
 Image g_rtxImage;	// Lighting buffer
 Image g_rtxImageAccumulated;
 Image g_rtxImageDenoised;
@@ -200,6 +203,8 @@ bool InitGlobalIllumination( DeviceContext * device, int width, int height ) {
 		Pipeline::CreateParms_t pipelineParms;
 		memset( &pipelineParms, 0, sizeof( pipelineParms ) );
 		pipelineParms.descriptors = &g_rtxGIAccumulatorDescriptors;
+		pipelineParms.pushConstantSize = sizeof( int ) * 2;
+		pipelineParms.pushConstantShaderStages = VkShaderStageFlagBits::VK_SHADER_STAGE_COMPUTE_BIT;
 		pipelineParms.shader = g_shaderManager->GetShader( "Raytracing/rtxGIAccumulator" );
 		result = g_rtxGIAccumulatorPipeline.CreateCompute( device, pipelineParms );
 		if ( !result ) {
@@ -230,6 +235,8 @@ bool InitGlobalIllumination( DeviceContext * device, int width, int height ) {
 		Pipeline::CreateParms_t pipelineParms;
 		memset( &pipelineParms, 0, sizeof( pipelineParms ) );
 		pipelineParms.descriptors = &g_rtxGIMomentsDescriptors;
+		pipelineParms.pushConstantSize = sizeof( int ) * 2;
+		pipelineParms.pushConstantShaderStages = VkShaderStageFlagBits::VK_SHADER_STAGE_COMPUTE_BIT;
 		pipelineParms.shader = g_shaderManager->GetShader( "Raytracing/rtxGIMoments" );
 		result = g_rtxGIMomentsPipeline.CreateCompute( device, pipelineParms );
 		if ( !result ) {
@@ -260,7 +267,7 @@ bool InitGlobalIllumination( DeviceContext * device, int width, int height ) {
 		Pipeline::CreateParms_t pipelineParms;
 		memset( &pipelineParms, 0, sizeof( pipelineParms ) );
 		pipelineParms.descriptors = &g_rtxGIWaveletDescriptors;
-		pipelineParms.pushConstantSize = sizeof( int ) * 4;
+		pipelineParms.pushConstantSize = sizeof( int ) * 6;
 		pipelineParms.pushConstantShaderStages = VkShaderStageFlagBits::VK_SHADER_STAGE_COMPUTE_BIT;
 		pipelineParms.shader = g_shaderManager->GetShader( "Raytracing/rtxGIWavelet" );
 		result = g_rtxGIWaveletPipeline.CreateCompute( device, pipelineParms );
@@ -354,6 +361,9 @@ InitRaytracing
 ====================================================
 */
 bool InitRaytracing( DeviceContext * device, int width, int height ) {
+	g_rtxWidth = width;
+	g_rtxHeight = height;
+
 	bool result = false;
 #if defined( ENABLE_RAYTRACING )
 	result = InitGlobalIllumination( device, width, height );
@@ -528,6 +538,8 @@ bool InitRaytracing( DeviceContext * device, int width, int height ) {
 		Pipeline::CreateParms_t pipelineParms;
 		memset( &pipelineParms, 0, sizeof( pipelineParms ) );
 		pipelineParms.descriptors = &g_rtxSVGFDenoiserAccumulatorDescriptors;
+		pipelineParms.pushConstantSize = sizeof( int ) * 2;
+		pipelineParms.pushConstantShaderStages = VkShaderStageFlagBits::VK_SHADER_STAGE_COMPUTE_BIT;
 		pipelineParms.shader = g_shaderManager->GetShader( "Raytracing/rtxDenoiserSVGFAccumulator" );
 		result = g_rtxSVGFDenoiserAccumulatorPipeline.CreateCompute( device, pipelineParms );
 		if ( !result ) {
@@ -558,6 +570,8 @@ bool InitRaytracing( DeviceContext * device, int width, int height ) {
 		Pipeline::CreateParms_t pipelineParms;
 		memset( &pipelineParms, 0, sizeof( pipelineParms ) );
 		pipelineParms.descriptors = &g_rtxSVGFDenoiserMomentsDescriptors;
+		pipelineParms.pushConstantSize = sizeof( int ) * 2;
+		pipelineParms.pushConstantShaderStages = VkShaderStageFlagBits::VK_SHADER_STAGE_COMPUTE_BIT;
 		pipelineParms.shader = g_shaderManager->GetShader( "Raytracing/rtxDenoiserSVGFMoments" );
 		result = g_rtxSVGFDenoiserMomentsPipeline.CreateCompute( device, pipelineParms );
 		if ( !result ) {
@@ -588,7 +602,7 @@ bool InitRaytracing( DeviceContext * device, int width, int height ) {
 		Pipeline::CreateParms_t pipelineParms;
 		memset( &pipelineParms, 0, sizeof( pipelineParms ) );
 		pipelineParms.descriptors = &g_rtxSVGFDenoiserWaveletDescriptors;
-		pipelineParms.pushConstantSize = sizeof( int ) * 4;
+		pipelineParms.pushConstantSize = sizeof( int ) * 6;
 		pipelineParms.pushConstantShaderStages = VkShaderStageFlagBits::VK_SHADER_STAGE_COMPUTE_BIT;
 		pipelineParms.shader = g_shaderManager->GetShader( "Raytracing/rtxDenoiserSVGFWavelet" );
 		result = g_rtxSVGFDenoiserWaveletPipeline.CreateCompute( device, pipelineParms );
@@ -650,6 +664,8 @@ bool InitRaytracing( DeviceContext * device, int width, int height ) {
 		Pipeline::CreateParms_t pipelineParms;
 		memset( &pipelineParms, 0, sizeof( pipelineParms ) );
 		pipelineParms.descriptors = &g_rtxApplyDiffuseDescriptors;
+		pipelineParms.pushConstantSize = sizeof( int ) * 2;
+		pipelineParms.pushConstantShaderStages = VkShaderStageFlagBits::VK_SHADER_STAGE_COMPUTE_BIT;
 		pipelineParms.shader = g_shaderManager->GetShader( "Raytracing/rtxApplyDiffuse" );
 		result = g_rtxApplyDiffusePipeline.CreateCompute( device, pipelineParms );
 		if ( !result ) {
@@ -948,7 +964,7 @@ void TraceGI( DrawParms_t & parms ) {
 	g_rtxGIImageOut[ 0 ] = &g_rtxGIRawImages[ 0 ];
 	g_rtxGIImageOut[ 1 ] = &g_rtxGIRawImages[ 1 ];
 	g_rtxGIImageOut[ 2 ] = &g_rtxGIRawImages[ 2 ];
-//	return;
+	//return;
 
 	//
 	//	GI Accumulator
@@ -958,6 +974,10 @@ void TraceGI( DrawParms_t & parms ) {
 		Image * imgHistoryCounterDst = &g_rtxGIImageHistoryCounters[ ( g_numFrames + 1 ) & 1 ];
 
 		g_rtxGIAccumulatorPipeline.BindPipelineCompute( cmdBuffer );
+		int dims[ 2 ];
+		dims[ 0 ] = g_rtxWidth;
+		dims[ 1 ] = g_rtxHeight;
+		g_rtxGIAccumulatorPipeline.BindPushConstant( cmdBuffer, 0, sizeof( dims ), dims );
 
 		// Descriptor is how we bind our buffers and images
 		Descriptor descriptor = g_rtxGIAccumulatorPipeline.GetFreeDescriptor();
@@ -987,7 +1007,7 @@ void TraceGI( DrawParms_t & parms ) {
 		descriptor.BindStorageImage( g_rtxGIImageLumaHistory, Samplers::m_samplerStandard, 19 );
 
 		descriptor.BindDescriptor( device, cmdBuffer, &g_rtxGIAccumulatorPipeline );
-		g_rtxGIAccumulatorPipeline.DispatchCompute( cmdBuffer, ( 1920 + 7 ) / 8, ( 1080 + 7 ) / 8, 1 );
+		g_rtxGIAccumulatorPipeline.DispatchCompute( cmdBuffer, ( g_rtxWidth + 7 ) / 8, ( g_rtxHeight + 7 ) / 8, 1 );
 	}
 
 	MemoryBarriers::CreateImageMemoryBarrier( cmdBuffer, g_rtxGIAccumulatedImages[ 0 ], VK_IMAGE_ASPECT_COLOR_BIT );
@@ -1022,6 +1042,10 @@ void TraceGI( DrawParms_t & parms ) {
 		Image * imgHistoryCounterDst = &g_rtxGIImageHistoryCounters[ ( g_numFrames + 0 ) & 1 ];
 
 		g_rtxGIMomentsPipeline.BindPipelineCompute( cmdBuffer );
+		int dims[ 2 ];
+		dims[ 0 ] = g_rtxWidth;
+		dims[ 1 ] = g_rtxHeight;
+		g_rtxGIMomentsPipeline.BindPushConstant( cmdBuffer, 0, sizeof( dims ), dims );
 
 		// Descriptor is how we bind our buffers and images
 		Descriptor descriptor = g_rtxGIMomentsPipeline.GetFreeDescriptor();
@@ -1043,7 +1067,7 @@ void TraceGI( DrawParms_t & parms ) {
 		descriptor.BindStorageImage( *imgHistoryCounterSrc, Samplers::m_samplerStandard, 12 );
 
 		descriptor.BindDescriptor( device, cmdBuffer, &g_rtxGIMomentsPipeline );
-		g_rtxGIMomentsPipeline.DispatchCompute( cmdBuffer, ( 1920 + 7 ) / 8, ( 1080 + 7 ) / 8, 1 );
+		g_rtxGIMomentsPipeline.DispatchCompute( cmdBuffer, ( g_rtxWidth + 7 ) / 8, ( g_rtxHeight + 7 ) / 8, 1 );
 
 		MemoryBarriers::CreateImageMemoryBarrier( cmdBuffer, *dstImages[ 0 ], VK_IMAGE_ASPECT_COLOR_BIT );
 		MemoryBarriers::CreateImageMemoryBarrier( cmdBuffer, *dstImages[ 1 ], VK_IMAGE_ASPECT_COLOR_BIT );
@@ -1083,11 +1107,13 @@ void TraceGI( DrawParms_t & parms ) {
 	//	GI Wavelet Filter
 	//
 	for ( int i = startIdx; i < 5 + startIdx; i++ ) {
-		int inters[4];
+		int inters[ 6 ];
 		inters[ 0 ] = i;
 		inters[ 1 ] = i;
 		inters[ 2 ] = i;
 		inters[ 3 ] = i;
+		inters[ 4 ] = g_rtxWidth;
+		inters[ 5 ] = g_rtxHeight;
 
 		Image * srcImages[ 3 ];
 		Image * dstImages[ 3 ];
@@ -1102,7 +1128,7 @@ void TraceGI( DrawParms_t & parms ) {
 		Image * dstLuma = ( ( i & 1 ) == 0 ) ? &g_rtxGIImageLumaB : &g_rtxGIImageLumaA;
 
 		g_rtxGIWaveletPipeline.BindPipelineCompute( cmdBuffer );
-		g_rtxGIWaveletPipeline.BindPushConstant( cmdBuffer, 0, sizeof( int ) * 4, inters );
+		g_rtxGIWaveletPipeline.BindPushConstant( cmdBuffer, 0, sizeof( int ) * 6, inters );
 
 		// Descriptor is how we bind our buffers and images
 		Descriptor descriptor = g_rtxGIWaveletPipeline.GetFreeDescriptor();
@@ -1122,7 +1148,7 @@ void TraceGI( DrawParms_t & parms ) {
 		descriptor.BindStorageImage( *dstLuma, Samplers::m_samplerStandard, 11 );
 
 		descriptor.BindDescriptor( device, cmdBuffer, &g_rtxGIWaveletPipeline );
-		g_rtxGIWaveletPipeline.DispatchCompute( cmdBuffer, ( 1920 + 7 ) / 8, ( 1080 + 7 ) / 8, 1 );
+		g_rtxGIWaveletPipeline.DispatchCompute( cmdBuffer, ( g_rtxWidth + 7 ) / 8, ( g_rtxHeight + 7 ) / 8, 1 );
 
 		MemoryBarriers::CreateImageMemoryBarrier( cmdBuffer, *dstImages[ 0 ], VK_IMAGE_ASPECT_COLOR_BIT );
 		MemoryBarriers::CreateImageMemoryBarrier( cmdBuffer, *dstImages[ 1 ], VK_IMAGE_ASPECT_COLOR_BIT );
@@ -1196,9 +1222,11 @@ void TraceDL( DrawParms_t & parms ) {
 		g_rtxImportanceSamplingPipeline.TraceRays( cmdBuffer );
 	}
 #endif
-	g_rtxImageOut = &g_rtxImage;
-
+	
 	MemoryBarriers::CreateImageMemoryBarrier( cmdBuffer, g_rtxImage, VK_IMAGE_ASPECT_COLOR_BIT );
+
+	g_rtxImageOut = &g_rtxImage;
+	//return;
 
 	//
 	//	Denoising
@@ -1215,7 +1243,7 @@ void TraceDL( DrawParms_t & parms ) {
 		descriptor.BindStorageImage( g_gbuffer.m_imageColor[ 1 ], Samplers::m_samplerStandard, 3 );
 		descriptor.BindStorageImage( g_gbuffer.m_imageColor[ 2 ], Samplers::m_samplerStandard, 4 );
 		descriptor.BindDescriptor( device, cmdBuffer, &g_rtxDenoiserPipeline );
-		g_rtxDenoiserPipeline.DispatchCompute( cmdBuffer, ( 1920 + 7 ) / 8, ( 1080 + 7 ) / 8, 1 );
+		g_rtxDenoiserPipeline.DispatchCompute( cmdBuffer, ( g_rtxWidth + 7 ) / 8, ( g_rtxHeight + 7 ) / 8, 1 );
 	}
 #else
 	// Accumulator
@@ -1224,6 +1252,10 @@ void TraceDL( DrawParms_t & parms ) {
 		Image * imgHistoryCounterDst = &g_rtxImageHistoryCounters[ ( g_numFrames + 1 ) & 1 ];
 
 		g_rtxSVGFDenoiserAccumulatorPipeline.BindPipelineCompute( cmdBuffer );
+		int dims[ 2 ];
+		dims[ 0 ] = g_rtxWidth;
+		dims[ 1 ] = g_rtxHeight;
+		g_rtxSVGFDenoiserAccumulatorPipeline.BindPushConstant( cmdBuffer, 0, sizeof( dims ), dims );
 
 		// Descriptor is how we bind our buffers and images
 		Descriptor descriptor = g_rtxSVGFDenoiserAccumulatorPipeline.GetFreeDescriptor();
@@ -1248,7 +1280,7 @@ void TraceDL( DrawParms_t & parms ) {
 		descriptor.BindStorageImage( g_rtxImageLumaHistory, Samplers::m_samplerStandard, 13 );
 
 		descriptor.BindDescriptor( device, cmdBuffer, &g_rtxSVGFDenoiserAccumulatorPipeline );
-		g_rtxSVGFDenoiserAccumulatorPipeline.DispatchCompute( cmdBuffer, ( 1920 + 7 ) / 8, ( 1080 + 7 ) / 8, 1 );
+		g_rtxSVGFDenoiserAccumulatorPipeline.DispatchCompute( cmdBuffer, ( g_rtxWidth + 7 ) / 8, ( g_rtxHeight + 7 ) / 8, 1 );
 	}
 	g_rtxImageOut = &g_rtxImageAccumulated;
 
@@ -1297,6 +1329,10 @@ void TraceDL( DrawParms_t & parms ) {
 		Image * imgHistoryCounterDst = &g_rtxImageHistoryCounters[ ( g_numFrames + 0 ) & 1 ];
 
 		g_rtxSVGFDenoiserMomentsPipeline.BindPipelineCompute( cmdBuffer );
+		int dims[ 2 ];
+		dims[ 0 ] = g_rtxWidth;
+		dims[ 1 ] = g_rtxHeight;
+		g_rtxSVGFDenoiserMomentsPipeline.BindPushConstant( cmdBuffer, 0, sizeof( dims ), dims );
 
 		// Descriptor is how we bind our buffers and images
 		Descriptor descriptor = g_rtxSVGFDenoiserMomentsPipeline.GetFreeDescriptor();
@@ -1314,7 +1350,7 @@ void TraceDL( DrawParms_t & parms ) {
 		descriptor.BindStorageImage( *imgHistoryCounterSrc, Samplers::m_samplerStandard, 8 );
 
 		descriptor.BindDescriptor( device, cmdBuffer, &g_rtxSVGFDenoiserMomentsPipeline );
-		g_rtxSVGFDenoiserMomentsPipeline.DispatchCompute( cmdBuffer, ( 1920 + 7 ) / 8, ( 1080 + 7 ) / 8, 1 );
+		g_rtxSVGFDenoiserMomentsPipeline.DispatchCompute( cmdBuffer, ( g_rtxWidth + 7 ) / 8, ( g_rtxHeight + 7 ) / 8, 1 );
 
 		MemoryBarriers::CreateImageMemoryBarrier( cmdBuffer, *dstImage, VK_IMAGE_ASPECT_COLOR_BIT );
 
@@ -1347,11 +1383,13 @@ void TraceDL( DrawParms_t & parms ) {
 #if 1
 	// SVGF Edge Avoiding Wavelet Filter
 	for ( int i = startIdx; i < 5 + startIdx; i++ ) {
-		int inters[4];
+		int inters[ 6 ];
 		inters[ 0 ] = i;
 		inters[ 1 ] = i;
 		inters[ 2 ] = i;
 		inters[ 3 ] = i;
+		inters[ 4 ] = g_rtxWidth;
+		inters[ 5 ] = g_rtxHeight;
 
 		Image * srcImage = ( ( i & 1 ) == 0 ) ? &g_rtxImageAccumulated : &g_rtxImageDenoised;
 		Image * dstImage = ( ( i & 1 ) == 0 ) ? &g_rtxImageDenoised : &g_rtxImageAccumulated;
@@ -1360,7 +1398,7 @@ void TraceDL( DrawParms_t & parms ) {
 		Image * dstLuma = ( ( i & 1 ) == 0 ) ? &g_rtxImageLumaB : &g_rtxImageLumaA;
 
 		g_rtxSVGFDenoiserWaveletPipeline.BindPipelineCompute( cmdBuffer );
-		g_rtxSVGFDenoiserWaveletPipeline.BindPushConstant( cmdBuffer, 0, sizeof( int ) * 4, inters );
+		g_rtxSVGFDenoiserWaveletPipeline.BindPushConstant( cmdBuffer, 0, sizeof( int ) * 6, inters );
 
 		// Descriptor is how we bind our buffers and images
 		Descriptor descriptor = g_rtxSVGFDenoiserWaveletPipeline.GetFreeDescriptor();
@@ -1376,7 +1414,7 @@ void TraceDL( DrawParms_t & parms ) {
 		descriptor.BindStorageImage( *dstLuma, Samplers::m_samplerStandard, 7 );
 
 		descriptor.BindDescriptor( device, cmdBuffer, &g_rtxSVGFDenoiserWaveletPipeline );
-		g_rtxSVGFDenoiserWaveletPipeline.DispatchCompute( cmdBuffer, ( 1920 + 7 ) / 8, ( 1080 + 7 ) / 8, 1 );
+		g_rtxSVGFDenoiserWaveletPipeline.DispatchCompute( cmdBuffer, ( g_rtxWidth + 7 ) / 8, ( g_rtxHeight + 7 ) / 8, 1 );
 
 		MemoryBarriers::CreateImageMemoryBarrier( cmdBuffer, *dstImage, VK_IMAGE_ASPECT_COLOR_BIT );
 
@@ -1409,7 +1447,7 @@ void TraceDL( DrawParms_t & parms ) {
 		descriptor.BindStorageImage( g_gbuffer.m_imageColor[ 2 ], Samplers::m_samplerStandard, 4 );
 
 		descriptor.BindDescriptor( device, cmdBuffer, &g_rtxDenoiserHolgerWaveletPipeline );
-		g_rtxDenoiserHolgerWaveletPipeline.DispatchCompute( cmdBuffer, ( 1920 + 7 ) / 8, ( 1080 + 7 ) / 8, 1 );
+		g_rtxDenoiserHolgerWaveletPipeline.DispatchCompute( cmdBuffer, ( g_rtxWidth + 7 ) / 8, ( g_rtxHeight + 7 ) / 8, 1 );
 
 		MemoryBarriers::CreateImageMemoryBarrier( cmdBuffer, *dstImage, VK_IMAGE_ASPECT_COLOR_BIT );
 
@@ -1483,7 +1521,10 @@ void DrawRaytracing( DrawParms_t & parms ) {
 #if 1
 	{
 		g_rtxApplyDiffusePipeline.BindPipelineCompute( cmdBuffer );
-		//g_rtxApplyDiffusePipeline.BindPushConstant( cmdBuffer, 0, sizeof( int ) * 4, inters );
+		int dims[ 2 ];
+		dims[ 0 ] = g_rtxWidth;
+		dims[ 1 ] = g_rtxHeight;
+		g_rtxApplyDiffusePipeline.BindPushConstant( cmdBuffer, 0, sizeof( dims ), dims );
 
 		// Descriptor is how we bind our buffers and images
 		Descriptor descriptor = g_rtxApplyDiffusePipeline.GetFreeDescriptor();
@@ -1498,7 +1539,7 @@ void DrawRaytracing( DrawParms_t & parms ) {
 		descriptor.BindStorageImage( *g_rtxGIImageOut[ 2 ], Samplers::m_samplerStandard, 6 );
 
 		descriptor.BindDescriptor( device, cmdBuffer, &g_rtxApplyDiffusePipeline );
-		g_rtxApplyDiffusePipeline.DispatchCompute( cmdBuffer, ( 1920 + 7 ) / 8, ( 1080 + 7 ) / 8, 1 );
+		g_rtxApplyDiffusePipeline.DispatchCompute( cmdBuffer, ( g_rtxWidth + 7 ) / 8, ( g_rtxHeight + 7 ) / 8, 1 );
 	}
 #endif
 

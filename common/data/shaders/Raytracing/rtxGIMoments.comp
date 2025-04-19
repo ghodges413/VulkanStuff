@@ -27,6 +27,11 @@ layout( binding = 11, rgba16f ) uniform writeonly image2D imageLumaDst;
 
 layout( binding = 12, r32ui ) uniform readonly uimage2D imageHistoryCounter;	// read write history counter
 
+layout( push_constant ) uniform ScreenDim {
+	uint width;
+	uint height;
+} PushConstant;
+
 
 // These are hard coded values that the authors of the SVGF paper found worked
 const float sigmaZ = 1;
@@ -124,7 +129,7 @@ main
 */
 void main() {
 	ivec2 st = ivec2( gl_GlobalInvocationID.xy );
-	if ( st.x >= 1920 || st.y >= 1080 ) {
+	if ( st.x >= PushConstant.width || st.y >= PushConstant.height ) {
 		return;
 	}
 
@@ -210,7 +215,7 @@ void main() {
 	for ( int yy = -radius; yy <= radius; yy++ ) {
 		for ( int xx = -radius; xx <= radius; xx++ ) {
 			ivec2 stq = st + ivec2( xx, yy );
-			if ( stq.x < 0 || stq.y < 0 || stq.x >= 1920 || stq.y >= 1080 ) {
+			if ( stq.x < 0 || stq.y < 0 || stq.x >= PushConstant.width || stq.y >= PushConstant.height ) {
 				continue;
 			}
 

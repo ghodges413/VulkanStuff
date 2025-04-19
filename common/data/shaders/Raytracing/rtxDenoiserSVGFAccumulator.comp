@@ -24,7 +24,11 @@ layout( binding = 11, rgba16f ) uniform readonly image2D imageVelocity;
 layout( binding = 12, rgba16f ) uniform image2D imageLuma;
 layout( binding = 13, rgba16f ) uniform readonly image2D imageLumaHistory;
 
-//shared vec2 groupData[ 256 ];
+layout( push_constant ) uniform ScreenDim {
+	uint width;
+	uint height;
+} PushConstant;
+
 
 bool IsCoplanar( vec3 pos, vec3 normal, vec3 historyPos ) {
 	vec3 ab = historyPos - pos;
@@ -61,7 +65,7 @@ SampleHistory
 bool SampleHistory( in uint modelID, in vec3 worldPos, in vec3 worldNormal, out vec3 dstColor, out uint numHistory, out vec4 dstLuma ) {
 	ivec2 sti = ivec2( gl_GlobalInvocationID.xy );
     vec4 velocity = imageLoad( imageVelocity, sti );
-	velocity.xy *= vec2( 1920, 1080 );
+	velocity.xy *= vec2( PushConstant.width, PushConstant.height );
 	//velocity.xy += vec2( sti.x, sti.y );
 
 	vec2 st = fract( velocity.xy );
@@ -126,7 +130,7 @@ bool SampleHistory( in uint modelID, in vec3 worldPos, in vec3 worldNormal, out 
 	float weightSum = 0;
 	for ( int i = 0; i < numTaps; i++ ) {
 		ivec2 st2 = sti + offsets[ i ];
-		if ( st2.x < 0 || st2.x >= 1980 || st2.y < 0 || st2.y >= 1080 ) {
+		if ( st2.x < 0 || st2.x >= PushConstant.width || st2.y < 0 || st2.y >= PushConstant.height ) {
 			weights[ i ] = 0;
 			continue;
 		}
@@ -186,7 +190,7 @@ main
 */
 void main() {
 	ivec2 st = ivec2( gl_GlobalInvocationID.xy );
-	if ( st.x >= 1920 || st.y >= 1080 ) {
+	if ( st.x >= PushConstant.width || st.y >= PushConstant.height ) {
 		return;
 	}
 

@@ -129,7 +129,7 @@ reservoir_t AddSample( in reservoir_t douche, inout uint seed ) {
 	float w = douche.weightSum;
 
 	// TODO: group the reservoirs in squares so that this is cache friendlier
-	uint reservoirIdx = gl_LaunchIDNV.y * 1920 + gl_LaunchIDNV.x;
+	uint reservoirIdx = gl_LaunchIDNV.y * gl_LaunchSizeNV.x + gl_LaunchIDNV.x;
 	reservoir_t oldSample = reservoir[ reservoirIdx ];
 
 	//float weight = oldSample.weightSum + w;
@@ -152,7 +152,7 @@ GenerateSample
 */
 reservoir_t GenerateSample( in vec3 x0, inout uint seed, in vec3 normal ) {
 	// TODO: group the reservoirs in squares so that this is cache friendlier
-	uint reservoirIdx = gl_LaunchIDNV.y * 1920 + gl_LaunchIDNV.x;
+	uint reservoirIdx = gl_LaunchIDNV.y * gl_LaunchSizeNV.x + gl_LaunchIDNV.x;
 	reservoir[ reservoirIdx ].weightSum = 0;
 
 	reservoir_t douche;

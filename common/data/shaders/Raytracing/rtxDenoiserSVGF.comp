@@ -25,6 +25,11 @@ layout( binding = 6, rgba32f ) uniform readonly image2D imageGBufferHistory0;
 layout( binding = 7, rgba16f ) uniform readonly image2D imageGBufferHistory1;
 layout( binding = 8, rgba16f ) uniform readonly image2D imageGBufferHistory2;
 
+layout( push_constant ) uniform ScreenDim {
+	uint width;
+	uint height;
+} PushConstant;
+
 //layout( binding = 9, rgba16f ) uniform readonly image2D imageVelocity;
 
 //shared vec2 groupData[ 256 ];
@@ -40,7 +45,7 @@ bool SampleHistory( in vec3 worldPos, in vec3 worldNormal, in vec4 srcColor, out
 
 	ivec2 sti = ivec2( gl_GlobalInvocationID.xy );
     vec4 velocity = imageLoad( imageVelocity, sti );
-	velocity.xy *= vec2( 1920, 1080 );
+	velocity.xy *= vec2( PushConstant.width, PushConstant.height );
 	velocity.xy += vec2( sti.x, sti.y );
 
 	// Sample the 2x2 pixel block and blend between them
@@ -115,7 +120,7 @@ bool SampleHistory( in vec3 worldPos, in vec3 worldNormal, in vec4 srcColor, out
  */
 void main() {
 	ivec2 st = ivec2( gl_GlobalInvocationID.xy );
-	if ( st.x >= 1920 || st.y >= 1080 ) {
+	if ( st.x >= PushConstant.width || st.y >= PushConstant.height ) {
 		return;
 	}
 
