@@ -793,9 +793,11 @@ bool Model::BuildFromBrush( const brush_t * brush ) {
 			vert_t::Vec3ToByte4( tang, vert.tang );
 
 			// Select the vertex color from the normal (this is for global illumination)
-			vert.buff[ 0 ] = 0;
-			vert.buff[ 1 ] = 0;
-			vert.buff[ 2 ] = 0;
+			unsigned char color = 0;
+			color = 128;
+			vert.buff[ 0 ] = color;
+			vert.buff[ 1 ] = color;
+			vert.buff[ 2 ] = color;
 			vert.buff[ 3 ] = 255;
 			float x2 = plane.normal.x * plane.normal.x;
 			float y2 = plane.normal.y * plane.normal.y;
