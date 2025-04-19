@@ -256,6 +256,13 @@ bool Model::LoadOBJ( const char * localFileName ) {
 			vert_t::Vec3ToByte4( tangent, vert.tang );
 			vert_t::Vec3ToByte4( bitangent, vert.buff );
 
+			// HACK: default the vertex color to white for ray traced GI
+			//  In a real renderer, we would use the texture data to calculate the color
+			vert.buff[ 0 ] = 255;//101;
+			vert.buff[ 1 ] = 255;//48;
+			vert.buff[ 2 ] = 255;//36;
+			vert.buff[ 3 ] = 255;
+
 			m_vertices.push_back( vert );
 			m_indices.push_back( count );
 			count++;
