@@ -385,7 +385,7 @@ bool InitRaytracing( DeviceContext * device, int width, int height ) {
 		descriptorParms.numUniformsRayGen = 1;
 		descriptorParms.numStorageImagesRayGen = 1;
 		//descriptorParms.numStorageBuffersRayGen = 1;
-		descriptorParms.numStorageBuffersClosestHit = 2;
+		descriptorParms.numStorageBuffersClosestHit = 3;
 		descriptorParms.numStorageBuffersClosestHitArraySize = 8192;	// The max array size of the descriptors (the max number of render models in this case)
 		result = g_rtxSimpleDescriptors.Create( device, descriptorParms );
 		if ( !result ) {
@@ -850,7 +850,8 @@ void UpdateRaytracing( DeviceContext * device, const RenderModel * models, int n
 #if defined( ENABLE_RAYTRACING )
 	if ( !g_isAccelerationBuilt ) {
 		for ( int i = 0; i < numModels; i++ ) {
-			g_rtxAccelerationStructure.AddGeometry( device, models[ i ].modelDraw, models[ i ].pos, models[ i ].orient );
+			const RenderModel & model = models[ i ];
+			g_rtxAccelerationStructure.AddGeometry( device, model.modelDraw, model.pos, model.orient );
 		}
 		g_isAccelerationBuilt = g_rtxAccelerationStructure.Build( device );
 	} else {
@@ -892,7 +893,7 @@ void TraceSimple( DrawParms_t & parms ) {
 		descriptor.BindBuffer( uniforms, camOffset, camSize, 2 );
 		
 		descriptor.BindRenderModelsRTX( parms.notCulledRenderModels, parms.numNotCulledRenderModels, 3, 4 );
-//		descriptor.BindStorageBuffer( orientRTX, 0, orientRTX->m_vkBufferSize, 5 );
+		descriptor.BindStorageBuffer( orientRTX, 0, orientRTX->m_vkBufferSize, 5 );
 
 		descriptor.BindDescriptor( device, cmdBuffer, &g_rtxSimplePipeline );
 		g_rtxSimplePipeline.TraceRays( cmdBuffer );

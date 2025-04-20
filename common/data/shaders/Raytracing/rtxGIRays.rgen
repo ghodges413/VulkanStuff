@@ -280,7 +280,7 @@ void main() {
 	// (we're skipping this now, because we are not currently storing
 	// diffuse color in the triangle vertices)
 	vec3 color = record0.color.rgb * light.mColor.rgb * light.mColor.w;
-	//color = light.mColor.rgb * light.mColor.w;
+	color = light.mColor.rgb * light.mColor.w;
 
 	vec3 lighting = dotdot * color / dist;
 	//lighting = record0.color.rgb;

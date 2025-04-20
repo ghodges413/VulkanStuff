@@ -821,8 +821,12 @@ void Application::UpdateUniforms() {
 			matOrient.Orient( entity.pos, entity.fwd, entity.up );
 			matOrient = matOrient.Transpose();	// Vulkan is column major
 
+			Mat3 matRot;
+			matRot.Orient( entity.fwd, entity.up );
+
 			RenderModel renderModel;
 			renderModel.modelDraw = modelBlock;
+			renderModel.orient = Quat( matRot );
 #if defined( RENDER_BRUSHES )
 			if ( i < g_renderBrushes.size() ) {
 				renderModel = g_renderBrushes[ i ];

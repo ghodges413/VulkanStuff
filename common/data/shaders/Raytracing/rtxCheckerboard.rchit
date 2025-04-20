@@ -41,7 +41,7 @@ layout( std430, binding = 3, set = 0 ) readonly buffer VertexArray { vert_t v[];
 layout( binding = 3, set = 0 ) readonly buffer VertexArray { float v[]; } Vertices[];
 #endif
 layout( binding = 4, set = 0 ) readonly buffer IndexArray { uint i[]; } Indices[];
-//layout( binding = 5, set = 0 ) readonly buffer OrientArray { mat4 Orients[]; };
+layout( binding = 5, set = 0 ) readonly buffer OrientArray { mat4 Orients[]; };
 #endif
 
 struct record_t {
@@ -219,6 +219,12 @@ record_t GetRecord( in uint iID, in uint primitiveID ) {
 	vec3 tang = t0 * uvw.x + t1 * uvw.y + t2 * uvw.z;
 	vec4 color = c0 * uvw.x + c1 * uvw.y + c2 * uvw.z;
 
+	mat4 orient = Orients[ iID ];
+	vec4 pos2 = orient * vec4( pos, 1.0 );
+	vec4 norm2 = orient * vec4( norm, 0.0 );
+	pos = pos2.xyz;
+	norm = norm2.xyz;
+
 	vec3 ab = v1 - v0;
 	vec3 bc = v2 - v1;
 //	norm = normalize( cross( ab, bc ) );
@@ -263,10 +269,9 @@ void main() {
 	//gl_PrimitiveID	// The index of the triangle in the model we hit
 	hitValue = GetRecord( gl_InstanceID, gl_PrimitiveID );
 
-//	mat4 orient = Orients[ gl_InstanceID ];
-
-//	hitValue.pos = orient * hitValue.pos;
-//	hitValue.norm = orient * hitValue.norm;
+	//mat4 orient = Orients[ gl_InstanceID ];
+	//hitValue.pos = orient * hitValue.pos;
+	//hitValue.norm = orient * hitValue.norm;
 #else
 	pos = gl_WorldRayOriginNV + gl_RayTmaxNV * gl_WorldRayDirectionNV;
 	hitValue.pos.xyz = pos;

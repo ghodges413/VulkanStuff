@@ -222,10 +222,10 @@ void main() {
 	//gl_PrimitiveID	// The index of the triangle in the model we hit
 	hitValue = GetRecord( gl_InstanceID, gl_PrimitiveID );
 
-//	mat4 orient = Orients[ gl_InstanceID ];
+	mat4 orient = Orients[ gl_InstanceID ];
 
-//	hitValue.pos = orient * hitValue.pos;
-//	hitValue.norm = orient * hitValue.norm;
+	hitValue.pos = orient * hitValue.pos;
+	hitValue.norm = orient * hitValue.norm;
 #else
 
 	pos = gl_WorldRayOriginNV + gl_RayTmaxNV * gl_WorldRayDirectionNV;
