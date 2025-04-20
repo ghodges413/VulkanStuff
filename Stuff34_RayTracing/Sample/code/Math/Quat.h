@@ -104,29 +104,26 @@ inline Quat::Quat( const Mat3 & rot ) {
 		z = ( rot.rows[ 1 ][ 0 ] - rot.rows[ 0 ][ 1 ] ) * invW;
 	} else {
 		if ( rot.rows[ 0 ][ 0 ] > rot.rows[ 1 ][ 1 ] && rot.rows[ 0 ][ 0 ] > rot.rows[ 2 ][ 2 ] ) {
-			float s = sqrtf( 1.0f + rot.rows[ 0 ][ 0 ] - rot.rows[ 1 ][ 1 ] - rot.rows[ 2 ][ 2 ] ) * 0.5f;
-			float invS = 0.25f / s;
+			x = sqrtf( 1.0f + rot.rows[ 0 ][ 0 ] - rot.rows[ 1 ][ 1 ] - rot.rows[ 2 ][ 2 ] ) * 0.5f;
+			float invX = 0.25f / x;
 
-			w = ( rot.rows[ 2 ][ 1 ] - rot.rows[ 1 ][ 2 ] ) * invS;
-			x = s;
-			y = ( rot.rows[ 0 ][ 1 ] + rot.rows[ 1 ][ 0 ] ) * invS;
-			z = ( rot.rows[ 0 ][ 2 ] + rot.rows[ 2 ][ 0 ] ) * invS;
+			w = ( rot.rows[ 2 ][ 1 ] - rot.rows[ 1 ][ 2 ] ) * invX;
+			y = ( rot.rows[ 1 ][ 0 ] + rot.rows[ 0 ][ 1 ] ) * invX;
+			z = ( rot.rows[ 0 ][ 2 ] + rot.rows[ 2 ][ 0 ] ) * invX;
 		} else if ( rot.rows[ 1 ][ 1 ] > rot.rows[ 2 ][ 2 ] ) {
-			float s = sqrtf( 1.0f + rot.rows[ 1 ][ 1 ] - rot.rows[ 2 ][ 2 ] - rot.rows[ 0 ][ 0 ] ) * 0.5f;
-			float invS = 0.25f / s;
+			y = sqrtf( 1.0f + rot.rows[ 1 ][ 1 ] - rot.rows[ 2 ][ 2 ] - rot.rows[ 0 ][ 0 ] ) * 0.5f;
+			float invY = 0.25f / y;
 
-			w = ( rot.rows[ 0 ][ 2 ] - rot.rows[ 2 ][ 0 ] ) * invS;
-			x = ( rot.rows[ 0 ][ 1 ] + rot.rows[ 1 ][ 0 ] ) * invS;
-			y = s;
-			z = ( rot.rows[ 1 ][ 2 ] + rot.rows[ 2 ][ 1 ] ) * invS;
+			w = ( rot.rows[ 0 ][ 2 ] - rot.rows[ 2 ][ 0 ] ) * invY;
+			x = ( rot.rows[ 1 ][ 0 ] + rot.rows[ 0 ][ 1 ] ) * invY;
+			z = ( rot.rows[ 2 ][ 1 ] + rot.rows[ 1 ][ 2 ] ) * invY;
 		} else {
-			float s = sqrtf( 1.0f + rot.rows[ 2 ][ 2 ] - rot.rows[ 0 ][ 0 ] - rot.rows[ 1 ][ 1 ] ) * 0.5f;
-			float invS = 0.25f / s;
+			z = sqrtf( 1.0f + rot.rows[ 2 ][ 2 ] - rot.rows[ 0 ][ 0 ] - rot.rows[ 1 ][ 1 ] ) * 0.5f;
+			float invZ = 0.25f / z;
 
-			w = ( rot.rows[ 1 ][ 0 ] - rot.rows[ 0 ][ 1 ] ) * invS;
-			x = ( rot.rows[ 0 ][ 2 ] + rot.rows[ 2 ][ 0 ] ) * invS;
-			y = ( rot.rows[ 1 ][ 2 ] + rot.rows[ 2 ][ 1 ] ) * invS;
-			z = s;
+			w = ( rot.rows[ 1 ][ 0 ] - rot.rows[ 0 ][ 1 ] ) * invZ;
+			x = ( rot.rows[ 0 ][ 2 ] + rot.rows[ 2 ][ 0 ] ) * invZ;
+			y = ( rot.rows[ 2 ][ 1 ] + rot.rows[ 1 ][ 2 ] ) * invZ;
 		}
 	}
 }
