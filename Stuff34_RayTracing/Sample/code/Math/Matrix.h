@@ -132,6 +132,7 @@ public:
 	Mat3 Inverse() const;
 	Mat2 Minor( const int i, const int j ) const;
 	float Cofactor( const int i, const int j ) const;
+	void Orient( const Vec3 & fwd, const Vec3 & up );
 
 	Vec3 operator * ( const Vec3 & rhs ) const;
 	Mat3 operator * ( const float rhs ) const;
@@ -260,6 +261,18 @@ inline float Mat3::Cofactor( const int i, const int j ) const {
 	const Mat2 minor = Minor( i, j );
 	const float C = float( pow( -1, i + 1 + j + 1 ) ) * minor.Determinant();
 	return C;
+}
+
+inline void Mat3::Orient( const Vec3 & fwd, const Vec3 & up ) {
+	Vec3 left = up.Cross( fwd );
+
+	// For our coordinate system where:
+	// +x-axis = fwd
+	// +y-axis = left
+	// +z-axis = up
+	rows[ 0 ] = Vec3( fwd.x, left.x, up.x );
+	rows[ 1 ] = Vec3( fwd.y, left.y, up.y );
+	rows[ 2 ] = Vec3( fwd.z, left.z, up.z );
 }
 
 inline Vec3 Mat3::operator * ( const Vec3 & rhs ) const {
