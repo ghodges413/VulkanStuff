@@ -17,6 +17,7 @@ public:
 	Quat( float X, float Y, float Z, float W );
 	Quat( Vec3 n, const float angleRadians );
 	Quat( float theta, float phi );
+	Quat( const Mat3 & rot );
 	const Quat & operator = ( const Quat & rhs );
 	
 	Quat &	operator *= ( const float & rhs );
@@ -89,6 +90,45 @@ inline Quat::Quat( float theta, float phi ) {
 	Quat tmpB = Quat( Vec3( 0, 0, 1 ), phi );
 
 	*this = tmpB * tmpA;
+}
+
+inline Quat::Quat( const Mat3 & rot ) {
+	float trace = rot.rows[ 0 ][ 0 ] + rot.rows[ 1 ][ 1 ] + rot.rows[ 2 ][ 2 ];
+
+	if ( trace > 0.0f ) {
+		w = sqrtf( 1.0f + trace ) * 0.5f;
+		float invW = 0.25f / w;
+
+		x = ( rot.rows[ 2 ][ 1 ] - rot.rows[ 1 ][ 2 ] ) * invW;
+		y = ( rot.rows[ 0 ][ 2 ] - rot.rows[ 2 ][ 0 ] ) * invW;
+		z = ( rot.rows[ 1 ][ 0 ] - rot.rows[ 0 ][ 1 ] ) * invW;
+	} else {
+		if ( rot.rows[ 0 ][ 0 ] > rot.rows[ 1 ][ 1 ] && rot.rows[ 0 ][ 0 ] > rot.rows[ 2 ][ 2 ] ) {
+			float s = sqrtf( 1.0f + rot.rows[ 0 ][ 0 ] - rot.rows[ 1 ][ 1 ] - rot.rows[ 2 ][ 2 ] ) * 0.5f;
+			float invS = 0.25f / s;
+
+			w = ( rot.rows[ 2 ][ 1 ] - rot.rows[ 1 ][ 2 ] ) * invS;
+			x = s;
+			y = ( rot.rows[ 0 ][ 1 ] + rot.rows[ 1 ][ 0 ] ) * invS;
+			z = ( rot.rows[ 0 ][ 2 ] + rot.rows[ 2 ][ 0 ] ) * invS;
+		} else if ( rot.rows[ 1 ][ 1 ] > rot.rows[ 2 ][ 2 ] ) {
+			float s = sqrtf( 1.0f + rot.rows[ 1 ][ 1 ] - rot.rows[ 2 ][ 2 ] - rot.rows[ 0 ][ 0 ] ) * 0.5f;
+			float invS = 0.25f / s;
+
+			w = ( rot.rows[ 0 ][ 2 ] - rot.rows[ 2 ][ 0 ] ) * invS;
+			x = ( rot.rows[ 0 ][ 1 ] + rot.rows[ 1 ][ 0 ] ) * invS;
+			y = s;
+			z = ( rot.rows[ 1 ][ 2 ] + rot.rows[ 2 ][ 1 ] ) * invS;
+		} else {
+			float s = sqrtf( 1.0f + rot.rows[ 2 ][ 2 ] - rot.rows[ 0 ][ 0 ] - rot.rows[ 1 ][ 1 ] ) * 0.5f;
+			float invS = 0.25f / s;
+
+			w = ( rot.rows[ 1 ][ 0 ] - rot.rows[ 0 ][ 1 ] ) * invS;
+			x = ( rot.rows[ 0 ][ 2 ] + rot.rows[ 2 ][ 0 ] ) * invS;
+			y = ( rot.rows[ 1 ][ 2 ] + rot.rows[ 2 ][ 1 ] ) * invS;
+			z = s;
+		}
+	}
 }
 
 inline const Quat & Quat::operator = ( const Quat & rhs ) {
