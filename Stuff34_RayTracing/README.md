@@ -12,7 +12,22 @@ Direct lighting + GI:
 ![Ray Tracing](rtxComplete0.jpg)
 ![Ray Tracing](rtxComplete1.jpg)
 
-Spatiotemporal Reservoir Resampling (ReSTIR) is an algorithm for path tracing that presents high quality results with only a few samples per pixel.
+More screenshots (Raw + Denoised):
+![Ray Tracing](screenshotRaw0.jpg)
+![Ray Tracing](screenshotDenoised0.jpg)
+
+![Ray Tracing](screenshotRaw1.jpg)
+![Ray Tracing](screenshotDenoised1.jpg)
+
+![Ray Tracing](screenshotRaw2.jpg)
+![Ray Tracing](screenshotDenoised2.jpg)
+
+![Ray Tracing](screenshotRaw3.jpg)
+![Ray Tracing](screenshotDenoised3.jpg)
+
+This sample uses importance sampling and SVGF denoising.
+
+TODO: Implement Spatiotemporal Reservoir Resampling (ReSTIR) as it is an algorithm for path tracing that presents high quality results with only a few samples per pixel.
 
 https://cs.dartmouth.edu/~wjarosz/publications/bitterli20spatiotemporal.html
 
